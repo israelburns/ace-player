@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gold">#C8A54E</color>
+    <color name="purple_accent">#6C5CE7</color>
+    <color name="dark_bg">#08080C</color>
+    <color name="dark_surface">#0D0D14</color>
+</resources>

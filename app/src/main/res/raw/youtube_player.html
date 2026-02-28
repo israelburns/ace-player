@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ACE PLAYER</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#08080c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100dvh;overflow:hidden;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+.top-bar{background:#0d0d14;padding:10px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1a1a2a;flex-shrink:0}
+.top-bar h1{font-size:13px;color:#c8a54e;letter-spacing:4px;font-weight:700}
+.top-bar .status{font-size:11px;color:#555;margin-left:auto;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:6px;height:6px;background:#4ade80;border-radius:50%;margin-left:6px;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.now-playing{background:linear-gradient(180deg,#0d0d16 0%,#08080c 100%);padding:20px 24px 16px;flex-shrink:0}
+.np-title{font-size:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.np-artist{font-size:15px;color:#888;margin-bottom:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-wrap{width:100%;height:12px;background:#1a1a2a;border-radius:6px;cursor:pointer;position:relative;margin-bottom:6px;touch-action:none}
+.prog-fill{height:100%;border-radius:6px;width:0%;background:linear-gradient(90deg,#6c5ce7 0%,#c8a54e 100%);transition:width 0.4s linear}
+.prog-knob{position:absolute;top:-4px;width:20px;height:20px;background:#fff;border-radius:50%;transform:translateX(-50%);left:0%;transition:left 0.4s linear;box-shadow:0 0 8px rgba(108,92,231,0.6)}
+.time-row{display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:16px}
+.controls{display:flex;align-items:center;justify-content:center;gap:20px}
+.ctrl{background:none;border:none;cursor:pointer;padding:12px;border-radius:50%;display:flex;align-items:center;justify-content:center;min-width:56px;min-height:56px;transition:background 0.15s}
+.ctrl:active{background:rgba(255,255,255,0.08)}
+.ctrl svg{fill:#fff;width:32px;height:32px}
+.ctrl.main{background:linear-gradient(135deg,#6c5ce7,#a855f7);min-width:72px;min-height:72px;border-radius:50%}
+.ctrl.main svg{width:40px;height:40px}
+.ctrl.main:active{background:linear-gradient(135deg,#5a4bd6,#9645e6)}
+.ctrl.side svg{width:24px;height:24px;fill:#666}
+.ctrl.side.on svg{fill:#c8a54e}
+.tab-row{display:flex;gap:6px;padding:12px 16px 8px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab-row::-webkit-scrollbar{display:none}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;color:#666;border:1px solid #1a1a2a;border-radius:20px;cursor:pointer;background:none;white-space:nowrap;min-height:44px;display:flex;align-items:center;flex-shrink:0}
+.tab.active{color:#c8a54e;border-color:#c8a54e;background:rgba(200,165,78,0.08)}
+.tab:active{background:rgba(255,255,255,0.05)}
+.playlist{flex:1;overflow-y:auto;padding:4px 12px 120px;-webkit-overflow-scrolling:touch}
+.track{display:flex;align-items:center;gap:14px;padding:16px 12px;border-bottom:1px solid #0f0f18;cursor:pointer;border-radius:10px;min-height:64px;transition:background 0.12s}
+.track:active{background:rgba(108,92,231,0.12)}
+.track.active{background:rgba(200,165,78,0.08)}
+.track.active .t-title{color:#c8a54e}
+.track.active .t-num{display:none}
+.track.active .eq{display:flex}
+.track.error .t-title{color:#555;text-decoration:line-through}
+.t-num{width:28px;font-size:14px;color:#444;text-align:center;flex-shrink:0;font-weight:600}
+.t-info{flex:1;min-width:0}
+.t-title{font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-artist{font-size:12px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eq{display:none;width:20px;height:20px;gap:2px;align-items:flex-end;flex-shrink:0}
+.eq span{width:4px;background:#c8a54e;border-radius:2px;animation:eq 0.7s ease-in-out infinite alternate}
+.eq span:nth-child(2){animation-delay:0.15s}
+.eq span:nth-child(3){animation-delay:0.3s}
+@keyframes eq{0%{height:4px}100%{height:16px}}
+#ytWrap{position:fixed;bottom:0;right:0;width:2px;height:2px;overflow:hidden;opacity:0.01;z-index:-1}
+.loading{position:fixed;inset:0;background:rgba(8,8,12,0.97);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity 0.5s}
+.loading.hide{opacity:0;pointer-events:none}
+.spinner{width:44px;height:44px;border:3px solid #1a1a2a;border-top-color:#c8a54e;border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{margin-top:16px;color:#444;font-size:12px;letter-spacing:2px}
+@media(orientation:landscape) and (max-height:500px){
+.now-playing{padding:10px 24px 8px}.np-title{font-size:18px}.controls{gap:16px}
+.ctrl{min-width:48px;min-height:48px;padding:8px}.ctrl.main{min-width:60px;min-height:60px}
+.track{padding:10px 12px;min-height:52px}.tab{padding:8px 14px;font-size:12px;min-height:38px}
+.playlist{padding-bottom:60px}
+}
+</style>
+</head>
+<body>
+<div class="top-bar">
+<h1>ACE PLAYER</h1>
+<span class="status" id="status">Loading</span>
+<span class="dot"></span>
+</div>
+<div class="now-playing">
+<div class="np-title" id="npTitle">ACE PLAYER</div>
+<div class="np-artist" id="npArtist">Tap a track to start</div>
+<div class="prog-wrap" id="progWrap">
+<div class="prog-fill" id="progFill"></div>
+<div class="prog-knob" id="progKnob"></div>
+</div>
+<div class="time-row"><span id="tNow">0:00</span><span id="tEnd">0:00</span></div>
+</div>
+<div class="controls">
+<button class="ctrl side" id="shufBtn" onclick="toggleShuffle()"><svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+<button class="ctrl" onclick="prev()"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+<button class="ctrl main" onclick="togglePlay()"><svg viewBox="0 0 24 24" id="ppIco"><path d="M8 5v14l11-7z"/></svg></button>
+<button class="ctrl" onclick="next()"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+<button class="ctrl side" id="repBtn" onclick="toggleRepeat()"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+</div>
+<div class="tab-row" id="tabs"></div>
+<div class="playlist" id="pl"></div>
+<div id="ytWrap"><div id="yt"></div></div>
+<div class="loading" id="loader"><div class="spinner"></div><p>LOADING</p></div>
+
+<script>
+const PL={
+ace:[
+{id:'D0-2yNNcPII',t:'Inclement Weather',a:'Ace Burns'},
+{id:'9R2HNOSVIF0',t:'Boss Fit',a:'Ace Burns'},
+{id:'gpUE7qWivgU',t:'Landlord',a:'Ace Burns'},
+{id:'tiQV1w6WS4U',t:'Myriad Transformation State',a:'Ace Burns'},
+{id:'fEPGSvSAzRA',t:'Life Is a Dreamo',a:'Ace Burns ft. World Famous'},
+{id:'X8CIQMaA09o',t:'BATH COLD WATER',a:'Ace Burns ft. P5yckonomixxx'},
+{id:'0nl3vzoY_Lg',t:'Witches Calling My Name',a:'Ace Burns'},
+{id:'hn8SIJpSjYc',t:'New Trepound',a:'Ace Burns'},
+{id:'uLC95rKVEJ8',t:"America's Going Crazy",a:'Ace Burns'},
+{id:'-r4eiliwfQg',t:'Get in Touch (Pop Off)',a:'Ace Burns'},
+{id:'LuvrBUewTjc',t:'Land of the Kush',a:'Ace Burns ft. YokeeGilla'},
+],
+drake:[
+{id:'V7UgPHjN9qE',t:'Jimmy Cooks',a:'Drake ft. 21 Savage'},
+{id:'H_AE7YSJSWU',t:'Sticky',a:'Drake'},
+{id:'bQ4GAMx1fJc',t:'Which One',a:'Drake ft. Central Cee'},
+{id:'qlkZ70r56ck',t:'KMT',a:'Drake ft. Giggs'},
+{id:'R0ykLlhg0AQ',t:'Money In The Grave',a:'Drake ft. Rick Ross'},
+{id:'wrhDUwYbTkI',t:'Evil Ways',a:'Drake ft. J. Cole'},
+{id:'3CxtK7-XtE0',t:'POPSTAR',a:'DJ Khaled ft. Drake'},
+{id:'3HFY0xuHybk',t:'Knife Talk',a:'Drake ft. 21 Savage'},
+{id:'Q5jnuOCJvK0',t:'Pain 1993',a:'Drake ft. Playboi Carti'},
+{id:'LDMTjY-QgD0',t:'Deep Pockets',a:'Drake'},
+{id:'yUif6C_uJgk',t:'Behind Barz',a:'Drake'},
+{id:'SlW7cZC4-Hw',t:"That's How You Feel",a:'Drake'},
+],
+bars:[
+{id:'H58vbez_m4E',t:'Not Like Us',a:'Kendrick Lamar'},
+{id:'fuV4yQWdn_4',t:'squabble up',a:'Kendrick Lamar'},
+{id:'sNPnbI1arSE',t:'My Name Is',a:'Eminem'},
+{id:'AHJKBqOmYRU',t:'Neighbors',a:'J. Cole'},
+{id:'v6HBZC9pZHQ',t:'family ties',a:'Baby Keem ft. Kendrick Lamar'},
+{id:'sAccm7xUH38',t:'Role Model',a:'Eminem'},
+{id:'w3333Fo6ufY',t:'a m a r i',a:'J. Cole'},
+{id:'D3BHlRlQeyA',t:'Respect the Game',a:'Meek Mill'},
+{id:'Xbw_BxDwdjk',t:'Guilty Conscience',a:'Eminem ft. Dr. Dre'},
+{id:'jU7ZZfrBhrw',t:'Compton',a:'Kendrick Lamar ft. Dr. Dre'},
+{id:'JiymQlBCtDI',t:'Intro (Championships)',a:'Meek Mill'},
+{id:'FpNWvxE9nXY',t:"What's Free",a:'Meek Mill ft. Jay-Z & Rick Ross'},
+],
+heat:[
+{id:'N9bKBAA22Go',t:'Like That',a:'Future & Metro Boomin ft. Kendrick'},
+{id:'UceaB4D0jpo',t:'rockstar',a:'Post Malone ft. 21 Savage'},
+{id:'I0fgkcTbBoI',t:'Type Shit',a:'Future & Metro Boomin ft. Travis & Carti'},
+{id:'U4mADkt6o-M',t:'redrum',a:'21 Savage'},
+{id:'-k8fJcyBlC8',t:'Private Landing',a:'Don Toliver ft. Bieber & Future'},
+{id:'l-pZco9ZLOQ',t:'10 Freaky Girls',a:'Metro Boomin ft. 21 Savage'},
+{id:'-705T4FioZE',t:'pushin P',a:'Gunna ft. Future & Young Thug'},
+{id:'A8bE-MPs0K0',t:'GTA',a:'Future & Metro Boomin'},
+{id:'G8Hp-AKrfm0',t:'The London',a:'Young Thug ft. J. Cole & Travis'},
+{id:'nyAHO0U-KQg',t:'March Madness',a:'Future'},
+{id:'gIKR1kkIvWA',t:'Crunk Aint Dead',a:'Duke Deuce'},
+{id:'DmWWqogr_r8',t:'a lot',a:'21 Savage ft. J. Cole'},
+],
+queens:[
+{id:'hsm4poTWjMs',t:'WAP',a:'Cardi B ft. Megan Thee Stallion'},
+{id:'PEGccV-NOm8',t:'Bodak Yellow',a:'Cardi B'},
+{id:'l_lblj8Cq0o',t:'No Limit',a:'G-Eazy ft. A$AP Rocky & Cardi B'},
+{id:'8zSRkr1nQNw',t:'Be Careful',a:'Cardi B'},
+{id:'Wpm07-BGJnE',t:'Chun-Li',a:'Nicki Minaj'},
+{id:'M8GX0cZ-xtw',t:'Good Form',a:'Nicki Minaj'},
+{id:'-WtNCR3EDS4',t:'Put It On Da Floor Again',a:'Latto ft. Cardi B'},
+{id:'_bvLphVWHpo',t:'Barbie Dreams',a:'Nicki Minaj'},
+{id:'zxtl5ExJmag',t:'Bed',a:'Nicki Minaj ft. Ariana Grande'},
+{id:'cyskqwwBeNw',t:'Get Up 10',a:'Cardi B'},
+{id:'H4Hb6HcCm_E',t:'Drip',a:'Cardi B ft. Migos'},
+{id:'ChotWwHqLpg',t:'Hard White',a:'Nicki Minaj'},
+],
+afro:[
+{id:'UjBhbMMgLzc',t:'Shake It To The Max (FLY)',a:'MOLIY ft. Skillibeng & Shenseea'},
+{id:'69RdQFDuYPI',t:'Is This Love',a:'Bob Marley'},
+{id:'j4vjVetZPpM',t:"You Don't Love Me (No No No)",a:'Dawn Penn'},
+{id:'XEL4ksfKIPk',t:'Awolowo',a:'Fido'},
+{id:'9qoNd60GcIA',t:'Hot Body',a:'Ayra Starr'},
+{id:'xH-3n5cNM0E',t:'Jealousy',a:'Khalil Harrison & Tyler ICU'},
+{id:'qARrn7G067w',t:'Laho',a:'Shallipopi'},
+{id:'9zEPGHPZCF8',t:'Red Flags',a:'Ruger'},
+{id:'Mb28JAoEKAU',t:'Big Thug Boys',a:'Babyboy AV'},
+{id:'ZpD9Yw8CD2A',t:'HEIS',a:'Rema'},
+{id:'qqqMyxv5al4',t:'Oye Mujer',a:'Raymix'},
+{id:'cvf7N6jdj4o',t:'Blame On Me',a:'Idara Atiri'},
+],
+smooth:[
+{id:'4NRXx6U8ABQ',t:'Blinding Lights',a:'The Weeknd'},
+{id:'dPhwbZBvW2o',t:'Go Crazy',a:'Chris Brown & Young Thug'},
+{id:'h_D3VFfhvs4',t:'Smooth Criminal',a:'Michael Jackson'},
+{id:'U0C1UrO91B8',t:'MUTT',a:'Leon Thomas'},
+{id:'1twUUM0KxDg',t:'Set Fire to the Rain',a:'Adele'},
+{id:'JRfuAukYTKg',t:'Titanium',a:'David Guetta ft. Sia'},
+{id:'eimgRedLkkU',t:'Walking On A Dream',a:'Empire of the Sun'},
+{id:'VOH6SzDX3l4',t:'Theme From Mahogany',a:'Diana Ross'},
+{id:'7xzU9Qqdqww',t:'Pursuit of Happiness',a:'Kid Cudi ft. MGMT'},
+{id:'ZbZSe6N_BXs',t:'Happy',a:'Pharrell Williams'},
+{id:'BHcYFxU4fMo',t:'Play That Funky Music',a:'Wild Cherry'},
+{id:'YlUKcNNmywk',t:'Californication',a:'Red Hot Chili Peppers'},
+],
+soul:[
+{id:'4TYv2PhG89A',t:'Smooth Operator',a:'Sade'},
+{id:'hDd2G_V1rzc',t:'Kiss from a Rose',a:'Seal'},
+{id:'_WcWHZc8s2I',t:'No Ordinary Love',a:'Sade'},
+{id:'4Fc67yQsPqQ',t:'Crazy',a:'Seal'},
+{id:'NYz8xs163YU',t:'Is It a Crime',a:'Sade'},
+{id:'Btl5PYdpcNs',t:'Prayer for the Dying',a:'Seal'},
+{id:'kcPc18SG6uA',t:'The Sweetest Taboo',a:'Sade'},
+{id:'iczaDcixBj4',t:"Love's Divine",a:'Seal'},
+{id:'C8QJmI_V3j4',t:'By Your Side',a:'Sade'},
+{id:'to90047YXac',t:'Killer',a:'Seal'},
+{id:'k1ljpLQ1V6Y',t:'Your Love Is King',a:'Sade'},
+{id:'49k_ZUcA_t0',t:'Fly Like an Eagle',a:'Seal'},
+],
+vibes:[
+{id:'7wfYIMyS_dI',t:'Only Time',a:'Enya'},
+{id:'RB-RcX5DS5A',t:'The Scientist',a:'Coldplay'},
+{id:'XFkzRNyygfk',t:'Creep',a:'Radiohead'},
+{id:'k4V3Mo61fJM',t:'Fix You',a:'Coldplay'},
+{id:'1uYWYWPc9HU',t:'Karma Police',a:'Radiohead'},
+{id:'yKNxeF4KMsY',t:'Yellow',a:'Coldplay'},
+{id:'fJ9rUzIMcZQ',t:'Bohemian Rhapsody',a:'Queen'},
+{id:'IQU4DoE1eBg',t:'Amarantine',a:'Enya'},
+{id:'-0MQXbcw-co',t:'Wish You Were Here',a:'Pink Floyd'},
+{id:'EpVXH3Vm2wg',t:'My Foolish Heart',a:'Bill Evans Trio'},
+{id:'5u-KWa3tL-0',t:'Cats in the Cradle',a:'Harry Chapin'},
+{id:'Wkk0puI6NfA',t:'Wild Child',a:'Enya'},
+],
+santana:[
+{id:'6Whgn_iE5uc',t:'Smooth',a:'Santana ft. Rob Thomas'},
+{id:'9wT1s96JIb0',t:'Black Magic Woman',a:'Santana'},
+{id:'nPLV7lGbmT4',t:'Maria Maria',a:'Santana ft. The Product G&B'},
+{id:'j5AUm_xaE9A',t:'Samba Pa Ti',a:'Santana'},
+{id:'Ot6pSrKT1oc',t:'Europa',a:'Santana'},
+{id:'JaaT_HRb4GU',t:'Soul Sacrifice',a:'Santana'},
+{id:'bQWOhPPYJkQ',t:'Flor de Luna (Moonflower)',a:'Santana'},
+{id:'J5OspxMTwis',t:'Breaking Down The Door',a:'Santana ft. Buika'},
+{id:'J7ATTjg7tpE',t:'Oye Como Va',a:'Santana'},
+{id:'gVPUAntzOl4',t:'Evil Ways',a:'Santana'},
+{id:'t6omUxqhG78',t:'Corazon Espinado',a:'Santana ft. Mana'},
+{id:'2wwfUEM3BWU',t:'Everybody Is Everything',a:'Santana'},
+],
+};
+
+const TAB_NAMES={ace:'Ace Burns',drake:'Drizzy',bars:'Bars',heat:'Heat',queens:'Queens',afro:'Afro',smooth:'Smooth',soul:'Soul',vibes:'Vibes',santana:'Santana'};
+const TAB_ORDER=['ace','drake','bars','heat','queens','afro','smooth','soul','vibes','santana'];
+
+let cur='ace',idx=-1,yt=null,ready=false;
+let shuf=false,rep=false,timer=null,shufQ=[];
+let errSet=new Set(),retries=0;
+
+/* === ANDROID BRIDGE HELPERS === */
+var hasAndroidBridge = (typeof AndroidBridge !== 'undefined');
+
+function bridgeStateChange(state) {
+    if (hasAndroidBridge) try { AndroidBridge.onStateChange(state); } catch(e) {}
+}
+function bridgeVideoInfo(videoId, title, author) {
+    if (hasAndroidBridge) try { AndroidBridge.onVideoInfo(videoId, title, author); } catch(e) {}
+}
+function bridgeError(code) {
+    if (hasAndroidBridge) try { AndroidBridge.onError(code); } catch(e) {}
+}
+function bridgeReady() {
+    if (hasAndroidBridge) try { AndroidBridge.onPlayerReady(); } catch(e) {}
+}
+
+/* === EXPOSED FOR NATIVE COMMANDS === */
+/* The Kotlin side calls: player.playVideo(), player.pauseVideo(), etc.
+   We expose a 'player' proxy that delegates to the YT player */
+var player = {
+    playVideo: function() { if (yt) yt.playVideo(); },
+    pauseVideo: function() { if (yt) yt.pauseVideo(); },
+    seekTo: function(sec, allowSeekAhead) { if (yt) yt.seekTo(sec, allowSeekAhead); },
+    loadVideoById: function(id) { if (yt) yt.loadVideoById({videoId: id, startSeconds: 0}); },
+    getCurrentTime: function() { return yt ? yt.getCurrentTime() : 0; },
+    getDuration: function() { return yt ? yt.getDuration() : 0; },
+    getPlayerState: function() { return yt ? yt.getPlayerState() : -1; }
+};
+
+function nextTrack() { next(); }
+function previousTrack() { prev(); }
+
+/* === UI FUNCTIONS === */
+function renderTabs(){
+document.getElementById('tabs').innerHTML=TAB_ORDER.map(k=>
+'<button class="tab'+(k===cur?' active':'')+'" onclick="switchPL(\''+k+'\')">'+TAB_NAMES[k]+'</button>'
+).join('');
+}
+
+function renderPL(){
+var tracks=PL[cur];
+document.getElementById('pl').innerHTML=tracks.map(function(t,i){
+var broken=errSet.has(t.id);
+return '<div class="track'+(i===idx?' active':'')+(broken?' error':'')+'" onclick="play('+i+')" id="tr'+i+'">'+
+'<span class="t-num">'+(i+1)+'</span>'+
+'<div class="eq"><span></span><span></span><span></span></div>'+
+'<div class="t-info"><div class="t-title">'+t.t+'</div><div class="t-artist">'+t.a+'</div></div>'+
+'</div>';
+}).join('');
+}
+
+function switchPL(k){cur=k;idx=-1;retries=0;renderTabs();buildShuf();renderPL();}
+
+function play(i){
+var tracks=PL[cur];
+if(i<0||i>=tracks.length)return;
+idx=i;retries=0;
+var t=tracks[i];
+document.getElementById('npTitle').textContent=t.t;
+document.getElementById('npArtist').textContent=t.a;
+renderPL();
+var el=document.getElementById('tr'+i);
+if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+if(ready){
+yt.loadVideoById({videoId:t.id,startSeconds:0});
+setTimeout(function(){try{yt.playVideo();}catch(e){}},300);
+setTimeout(function(){try{yt.playVideo();}catch(e){}},900);
+}
+setIcon(true);startTimer();stat('Loading...');
+bridgeVideoInfo(t.id, t.t, t.a);
+if('mediaSession' in navigator){
+navigator.mediaSession.metadata=new MediaMetadata({title:t.t,artist:t.a,album:'ACE PLAYER'});
+navigator.mediaSession.setActionHandler('play',function(){togglePlay();});
+navigator.mediaSession.setActionHandler('pause',function(){togglePlay();});
+navigator.mediaSession.setActionHandler('nexttrack',function(){next();});
+navigator.mediaSession.setActionHandler('previoustrack',function(){prev();});
+}
+}
+
+function togglePlay(){
+if(!ready)return;
+var s=yt.getPlayerState();
+if(s===1){yt.pauseVideo();setIcon(false);stat('Paused');}
+else{yt.playVideo();setIcon(true);stat('Playing');}
+}
+
+function next(){
+var tracks=PL[cur];
+if(shuf){var si=shufQ.indexOf(idx);play(shufQ[(si+1)%shufQ.length]);}
+else{play((idx+1)%tracks.length);}
+}
+
+function prev(){
+if(ready&&yt.getCurrentTime&&yt.getCurrentTime()>3){yt.seekTo(0);return;}
+var tracks=PL[cur];
+if(shuf){var si=shufQ.indexOf(idx);play(shufQ[(si-1+shufQ.length)%shufQ.length]);}
+else{play((idx-1+tracks.length)%tracks.length);}
+}
+
+function toggleShuffle(){shuf=!shuf;document.getElementById('shufBtn').classList.toggle('on',shuf);if(shuf)buildShuf();}
+function toggleRepeat(){rep=!rep;document.getElementById('repBtn').classList.toggle('on',rep);}
+
+function buildShuf(){
+var n=PL[cur].length;shufQ=[];for(var i=0;i<n;i++)shufQ.push(i);
+for(var i=n-1;i>0;i--){var j=Math.random()*i|0;var tmp=shufQ[i];shufQ[i]=shufQ[j];shufQ[j]=tmp;}
+}
+
+function startTimer(){
+if(timer)clearInterval(timer);
+timer=setInterval(function(){
+if(!ready||!yt.getCurrentTime)return;
+var c=yt.getCurrentTime()||0,d=yt.getDuration()||1;
+var p=(c/d)*100;
+document.getElementById('progFill').style.width=p+'%';
+document.getElementById('progKnob').style.left=p+'%';
+document.getElementById('tNow').textContent=fmt(c);
+document.getElementById('tEnd').textContent=fmt(d);
+},500);
+}
+
+document.getElementById('progWrap').addEventListener('click',function(e){
+if(!ready)return;
+var r=e.currentTarget.getBoundingClientRect();
+yt.seekTo((e.clientX-r.left)/r.width*(yt.getDuration()||0),true);
+});
+
+var dragging=false;
+document.getElementById('progWrap').addEventListener('touchstart',function(){dragging=true;},{passive:true});
+document.getElementById('progWrap').addEventListener('touchmove',function(e){
+if(!dragging||!ready)return;
+var r=e.currentTarget.getBoundingClientRect();
+var p=Math.max(0,Math.min(1,(e.touches[0].clientX-r.left)/r.width));
+document.getElementById('progFill').style.width=(p*100)+'%';
+document.getElementById('progKnob').style.left=(p*100)+'%';
+},{passive:true});
+document.getElementById('progWrap').addEventListener('touchend',function(e){
+if(!dragging||!ready)return;dragging=false;
+var r=e.currentTarget.getBoundingClientRect();
+var p=Math.max(0,Math.min(1,(e.changedTouches[0].clientX-r.left)/r.width));
+yt.seekTo(p*(yt.getDuration()||0),true);
+},{passive:true});
+
+function fmt(s){if(!s||isNaN(s))return'0:00';s=Math.floor(s);return(s/60|0)+':'+(s%60<10?'0':'')+(s%60);}
+function stat(t){document.getElementById('status').textContent=t;}
+function setIcon(playing){
+document.getElementById('ppIco').innerHTML=playing?
+'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>':'<path d="M8 5v14l11-7z"/>';
+}
+
+/* Auto-play first track on load for car experience */
+function autoPlayFirst(){
+if(idx===-1 && PL[cur].length > 0){
+play(0);
+}
+}
+
+var tag=document.createElement('script');
+tag.src='https://www.youtube.com/iframe_api';
+document.head.appendChild(tag);
+
+window.onYouTubeIframeAPIReady=function(){
+yt=new YT.Player('yt',{
+width:'320',height:'180',
+playerVars:{autoplay:1,controls:0,disablekb:1,fs:0,modestbranding:1,rel:0,playsinline:1,enablejsapi:1},
+events:{
+onReady:function(){
+ready=true;
+document.getElementById('loader').classList.add('hide');
+stat('Tap a track');
+bridgeReady();
+autoPlayFirst();
+},
+onStateChange:function(e){
+bridgeStateChange(e.data);
+if(e.data===1){setIcon(true);stat('Playing');retries=0;}
+if(e.data===2){setIcon(false);stat('Paused');}
+if(e.data===0){if(rep)play(idx);else next();}
+if(e.data===-1&&idx>=0){setTimeout(function(){try{yt.playVideo();}catch(e){}},500);}
+},
+onError:function(e){
+bridgeError(e.data);
+var tracks=PL[cur];
+if(idx>=0&&idx<tracks.length){errSet.add(tracks[idx].id);renderPL();}
+retries++;stat('Blocked — skipping');
+if(retries<tracks.length){setTimeout(function(){next();},800);}
+else{stat('All tracks blocked');retries=0;}
+}
+}
+});
+};
+
+buildShuf();renderTabs();renderPL();
+</script>
+</body>
+</html>

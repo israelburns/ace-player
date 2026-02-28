@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ACE PLAYER</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#08080c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100dvh;overflow:hidden;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+.top-bar{background:#0d0d14;padding:10px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1a1a2a;flex-shrink:0}
+.top-bar h1{font-size:13px;color:#c8a54e;letter-spacing:4px;font-weight:700}
+.top-bar .status{font-size:11px;color:#555;margin-left:auto;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:6px;height:6px;background:#4ade80;border-radius:50%;margin-left:6px;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.now-playing{background:linear-gradient(180deg,#0d0d16 0%,#08080c 100%);padding:16px 24px 14px;flex-shrink:0;display:flex;gap:16px;align-items:center}
+.np-art{width:72px;height:72px;border-radius:8px;background:#1a1a2a;flex-shrink:0;overflow:hidden}
+.np-art img{width:100%;height:100%;object-fit:cover}
+.np-info{flex:1;min-width:0}
+.np-title{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.np-artist{font-size:14px;color:#888;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-wrap{width:100%;height:10px;background:#1a1a2a;border-radius:5px;cursor:pointer;position:relative;margin-bottom:4px;touch-action:none}
+.prog-fill{height:100%;border-radius:5px;width:0%;background:linear-gradient(90deg,#6c5ce7 0%,#c8a54e 100%);transition:width 0.4s linear}
+.prog-knob{position:absolute;top:-5px;width:20px;height:20px;background:#fff;border-radius:50%;transform:translateX(-50%);left:0%;transition:left 0.4s linear;box-shadow:0 0 8px rgba(108,92,231,0.6)}
+.time-row{display:flex;justify-content:space-between;font-size:11px;color:#555}
+.controls{display:flex;align-items:center;justify-content:center;gap:18px;padding:4px 0 2px;flex-shrink:0}
+.ctrl{background:none;border:none;cursor:pointer;padding:10px;border-radius:50%;display:flex;align-items:center;justify-content:center;min-width:50px;min-height:50px;transition:background 0.15s}
+.ctrl:active{background:rgba(255,255,255,0.08)}
+.ctrl svg{fill:#fff;width:28px;height:28px}
+.ctrl.main{background:linear-gradient(135deg,#6c5ce7,#a855f7);min-width:64px;min-height:64px;border-radius:50%}
+.ctrl.main svg{width:36px;height:36px}
+.ctrl.main:active{background:linear-gradient(135deg,#5a4bd6,#9645e6)}
+.ctrl.side svg{width:22px;height:22px;fill:#666}
+.ctrl.side.on svg{fill:#c8a54e}
+.tab-row{display:flex;gap:5px;padding:8px 12px 6px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab-row::-webkit-scrollbar{display:none}
+.tab{padding:8px 14px;font-size:12px;font-weight:600;color:#666;border:1px solid #1a1a2a;border-radius:18px;cursor:pointer;background:none;white-space:nowrap;min-height:38px;display:flex;align-items:center;flex-shrink:0}
+.tab.active{color:#c8a54e;border-color:#c8a54e;background:rgba(200,165,78,0.08)}
+.tab:active{background:rgba(255,255,255,0.05)}
+.playlist{flex:1;overflow-y:auto;padding:2px 10px 100px;-webkit-overflow-scrolling:touch}
+.track{display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid #0f0f18;cursor:pointer;border-radius:8px;min-height:56px;transition:background 0.12s}
+.track:active{background:rgba(108,92,231,0.12)}
+.track.active{background:rgba(200,165,78,0.08)}
+.track.active .t-title{color:#c8a54e}
+.track.active .t-num{display:none}
+.track.active .eq{display:flex}
+.track.error .t-title{color:#555;text-decoration:line-through}
+.t-thumb{width:44px;height:44px;border-radius:6px;background:#1a1a2a;flex-shrink:0;overflow:hidden}
+.t-thumb img{width:100%;height:100%;object-fit:cover}
+.t-num{width:24px;font-size:13px;color:#444;text-align:center;flex-shrink:0;font-weight:600}
+.t-info{flex:1;min-width:0}
+.t-title{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-artist{font-size:11px;color:#666;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eq{display:none;width:18px;height:18px;gap:2px;align-items:flex-end;flex-shrink:0}
+.eq span{width:3px;background:#c8a54e;border-radius:2px;animation:eq 0.7s ease-in-out infinite alternate}
+.eq span:nth-child(2){animation-delay:0.15s}
+.eq span:nth-child(3){animation-delay:0.3s}
+@keyframes eq{0%{height:3px}100%{height:14px}}
+#ytWrap{position:fixed;bottom:0;right:0;width:2px;height:2px;overflow:hidden;opacity:0.01;z-index:-1}
+.loading{position:fixed;inset:0;background:rgba(8,8,12,0.97);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity 0.5s}
+.loading.hide{opacity:0;pointer-events:none}
+.spinner{width:44px;height:44px;border:3px solid #1a1a2a;border-top-color:#c8a54e;border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{margin-top:16px;color:#444;font-size:12px;letter-spacing:2px}
+@media(orientation:landscape) and (max-height:500px){
+.now-playing{padding:8px 20px 8px}.np-art{width:56px;height:56px}.np-title{font-size:16px}.controls{gap:14px}
+.ctrl{min-width:42px;min-height:42px;padding:6px}.ctrl.main{min-width:54px;min-height:54px}
+.track{padding:8px;min-height:46px}.tab{padding:6px 12px;font-size:11px;min-height:34px}
+.playlist{padding-bottom:50px}.t-thumb{width:36px;height:36px}
+}
+</style>
+</head>
+<body>
+<div class="top-bar">
+<h1>ACE PLAYER</h1>
+<span class="status" id="status">Loading</span>
+<span class="dot"></span>
+</div>
+<div class="now-playing">
+<div class="np-art" id="npArt"><img id="npImg" src="" alt=""></div>
+<div class="np-info">
+<div class="np-title" id="npTitle">ACE PLAYER</div>
+<div class="np-artist" id="npArtist">Tap a track to start</div>
+<div class="prog-wrap" id="progWrap">
+<div class="prog-fill" id="progFill"></div>
+<div class="prog-knob" id="progKnob"></div>
+</div>
+<div class="time-row"><span id="tNow">0:00</span><span id="tEnd">0:00</span></div>
+</div>
+</div>
+<div class="controls">
+<button class="ctrl side" id="shufBtn" onclick="toggleShuffle()"><svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+<button class="ctrl" onclick="prev()"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+<button class="ctrl main" onclick="togglePlay()"><svg viewBox="0 0 24 24" id="ppIco"><path d="M8 5v14l11-7z"/></svg></button>
+<button class="ctrl" onclick="next()"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+<button class="ctrl side" id="repBtn" onclick="toggleRepeat()"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+</div>
+<div class="tab-row" id="tabs"></div>
+<div class="playlist" id="pl"></div>
+<div id="ytWrap"><div id="yt"></div></div>
+<div class="loading" id="loader"><div class="spinner"></div><p>LOADING</p></div>
+
+<script>
+function T(id){return 'https://img.youtube.com/vi/'+id+'/mqdefault.jpg';}
+const PL={
+ace:[
+{id:'ogXC9YU_hmM',t:'Black Berry Whine',a:'Ace Burns'},
+{id:'9R2HNOSVIF0',t:'Boss Fit',a:'Ace Burns'},
+{id:'LuvrBUewTjc',t:'Land of the Kush',a:'Ace Burns ft. YokeeGilla'},
+{id:'-r4eiliwfQg',t:'Get in Touch (Pop Off)',a:'Ace Burns'},
+{id:'43QYeYqwO4s',t:'Wacoinda',a:'Ace Burns'},
+{id:'gcjTb7St5gY',t:'Wetin Dey Boot?',a:'Ace Burns'},
+{id:'ZVuwP1nybP4',t:'Undepress Me',a:'Ace Burns'},
+{id:'i1gyGfTcqdg',t:'Watch Your Step',a:'Ace Burns'},
+{id:'D0-2yNNcPII',t:'Inclement Weather',a:'Ace Burns'},
+{id:'xB-JVkBlZvo',t:"Everyone's a Criminal",a:'Ace Burns'},
+{id:'fEPGSvSAzRA',t:'Life Is a Dreamo',a:'Ace Burns ft. World Famous'},
+{id:'tiQV1w6WS4U',t:'Myriad Transformation State',a:'Ace Burns'},
+{id:'hn8SIJpSjYc',t:'New Trepound',a:'Ace Burns'},
+{id:'KzRNOQWBcLs',t:'F.B.I.',a:'Ace Burns'},
+{id:'iJoHCgW6eao',t:'Suicide Beside Me',a:'Ace Burns'},
+{id:'0nl3vzoY_Lg',t:'Witches Calling My Name',a:'Ace Burns'},
+{id:'SkI0SreFqe8',t:'Anything You Know',a:'Ace Burns'},
+{id:'A8ixTI-GYcM',t:'The Story of Fuck 12',a:'Ace Burns'},
+{id:'4Q8FVcHuEms',t:'Mercedes Slide',a:'Ace Burns'},
+{id:'X8CIQMaA09o',t:'BATH COLD WATER',a:'Ace Burns ft. P5yckonomixxx'},
+{id:'7jE_Cc8BIjQ',t:'Total & Complete Dickhead',a:'Ace Burns'},
+{id:'6TlhSim_DsM',t:'Money Bag Joe',a:'Ace Burns'},
+{id:'xbVeUEM-Um4',t:'Little Nefertiti',a:'Ace Burns'},
+{id:'gpUE7qWivgU',t:'Landlord',a:'Ace Burns'},
+{id:'HccmO4oTQnM',t:'Christmas in Cresco',a:'Ace Burns'},
+{id:'R_epAvrrFAw',t:"It's Not Too Late",a:'Ace Burns'},
+{id:'AYePSKcZvtA',t:"Bird's Eye View",a:'Ace Burns'},
+{id:'YGC80VaxALg',t:'Change My Ways',a:'Ace Burns'},
+{id:'F1gh3dN6y8I',t:'Get out While You Can',a:'Ace Burns'},
+{id:'uLC95rKVEJ8',t:"America's Going Crazy",a:'Ace Burns'},
+{id:'UTZIGx8uU8I',t:'A2d2',a:'Ace Burns'},
+{id:'l1ufIcUs8nw',t:'Night Riderz (Interlude)',a:'Ace Burns'},
+{id:'br1xjRH-3zY',t:'24k',a:'Ace Burns'},
+{id:'TlSaJzbyuhg',t:'Outsiding',a:'Ace Burns'},
+{id:'kgXdSATnFAk',t:'No Love in BLM',a:'Ace Burns'},
+{id:'IyGjgtc_4E0',t:'Save 857 Riverside Drive',a:'Ace Burns'},
+],
+drake:[
+{id:'V7UgPHjN9qE',t:'Jimmy Cooks',a:'Drake ft. 21 Savage'},
+{id:'H_AE7YSJSWU',t:'Sticky',a:'Drake'},
+{id:'C3oPcMlMaZg',t:'Free Smoke',a:'Drake'},
+{id:'SlW7cZC4-Hw',t:"That's How You Feel",a:'Drake'},
+{id:'qlkZ70r56ck',t:'KMT',a:'Drake ft. Giggs'},
+{id:'R0ykLlhg0AQ',t:'Money In The Grave',a:'Drake ft. Rick Ross'},
+{id:'rIhx2wZ8jnA',t:"I'm Upset",a:'Drake'},
+{id:'c-wR8Xh2PXM',t:'Fake Love',a:'Drake'},
+{id:'wrhDUwYbTkI',t:'Evil Ways',a:'Drake ft. J. Cole'},
+{id:'yUif6C_uJgk',t:'Behind Barz',a:'Drake'},
+{id:'LDMTjY-QgD0',t:'Deep Pockets',a:'Drake'},
+{id:'3HFY0xuHybk',t:'Knife Talk',a:'Drake ft. 21 Savage'},
+],
+bars:[
+{id:'H58vbez_m4E',t:'Not Like Us',a:'Kendrick Lamar'},
+{id:'fuV4yQWdn_4',t:'squabble up',a:'Kendrick Lamar'},
+{id:'JQbjS0_ZfJ0',t:'All The Stars',a:'Kendrick Lamar ft. SZA'},
+{id:'sNPnbI1arSE',t:'My Name Is',a:'Eminem'},
+{id:'CkpbkDB7EUk',t:'Neighbors',a:'J. Cole'},
+{id:'v6HBZC9pZHQ',t:'family ties',a:'Baby Keem ft. Kendrick Lamar'},
+{id:'Xbw_BxDwdjk',t:'Guilty Conscience',a:'Eminem ft. Dr. Dre'},
+{id:'qwxt7sDScvE',t:'Going Bad',a:'Meek Mill ft. Drake'},
+{id:'Is3bH2mYmkU',t:'On Me',a:'Meek Mill ft. Cardi B'},
+{id:'FpNWvxE9nXY',t:"What's Free",a:'Meek Mill ft. Jay-Z & Rick Ross'},
+{id:'U4Md8ZGtUN8',t:'Who Shot Ya?',a:'The Notorious B.I.G.'},
+{id:'78SV9tguyVM',t:'Kick in the Door',a:'The Notorious B.I.G.'},
+],
+heat:[
+{id:'ETPBnOlNeOw',t:'Mad Stalkers',a:'21 Savage'},
+{id:'xvZqHgFz51I',t:'Mask Off',a:'Future'},
+{id:'FFZljiPZcRg',t:'Feed Me Dope',a:'Future'},
+{id:'_EyZUTDAH0U',t:'BUTTERFLY EFFECT',a:'Travis Scott'},
+{id:'9v_rtaye2yY',t:'MotorSport',a:'Migos ft. Nicki Minaj & Cardi B'},
+{id:'Hm1YFszJWbQ',t:'Slippery',a:'Migos ft. Gucci Mane'},
+{id:'S-sJp1FfG7Q',t:'Bad and Boujee',a:'Migos ft. Lil Uzi Vert'},
+{id:'usu0XY4QNB0',t:'Welcome To The Party',a:'Pop Smoke'},
+{id:'oorVWW9ywG0',t:'Dior',a:'Pop Smoke'},
+{id:'H1KBHFXm2Bg',t:'Bank Account',a:'21 Savage'},
+{id:'uo14xGYwWd4',t:'I Get the Bag',a:'Gucci Mane ft. Migos'},
+{id:'bmc890o0yYY',t:'Ghostface Killers',a:'21 Savage ft. Travis Scott'},
+],
+queens:[
+{id:'hsm4poTWjMs',t:'WAP',a:'Cardi B ft. Megan Thee Stallion'},
+{id:'PEGccV-NOm8',t:'Bodak Yellow',a:'Cardi B'},
+{id:'hXnMSaK6C2w',t:'Bartier Cardi',a:'Cardi B ft. 21 Savage'},
+{id:'8zSRkr1nQNw',t:'Be Careful',a:'Cardi B'},
+{id:'Wpm07-BGJnE',t:'Chun-Li',a:'Nicki Minaj'},
+{id:'M8GX0cZ-xtw',t:'Good Form',a:'Nicki Minaj'},
+{id:'_bvLphVWHpo',t:'Barbie Dreams',a:'Nicki Minaj'},
+{id:'ChotWwHqLpg',t:'Hard White',a:'Nicki Minaj'},
+{id:'l_lblj8Cq0o',t:'No Limit',a:'G-Eazy ft. A$AP Rocky & Cardi B'},
+{id:'-WtNCR3EDS4',t:'Put It On Da Floor Again',a:'Latto ft. Cardi B'},
+{id:'H4Hb6HcCm_E',t:'Drip',a:'Cardi B ft. Migos'},
+{id:'cyskqwwBeNw',t:'Get Up 10',a:'Cardi B'},
+],
+afro:[
+{id:'dNt1QR1ecuM',t:'Charm',a:'Rema'},
+{id:'xxMTgqNjZGo',t:'Bounce',a:'Rema'},
+{id:'f0GAC0d2JIA',t:'Ginger Me',a:'Rema'},
+{id:'bLF90M96m2Q',t:'Buga (Lo Lo Lo)',a:'Kizz Daniel'},
+{id:'MLLm8Okhllg',t:'Bundle By Bundle',a:'Burna Boy'},
+{id:'bbVZo4Yw7pI',t:'Lonely At The Top',a:'Asake'},
+{id:'qrIP_igi76U',t:'Terminator',a:'Asake'},
+{id:'crtQSTYWtqE',t:'Rush',a:'Ayra Starr'},
+{id:'9qoNd60GcIA',t:'Hot Body',a:'Ayra Starr'},
+{id:'k6eE3c70hgg',t:'soso',a:'Omah Lay'},
+{id:'7M2Gps9xR8g',t:'Girlfriend',a:'Ruger'},
+{id:'qARrn7G067w',t:'Laho',a:'Shallipopi'},
+],
+smooth:[
+{id:'Z9eMk051dYg',t:'Party',a:'Chris Brown ft. Usher & Gucci Mane'},
+{id:'iGs1gODLiSQ',t:'Fine China',a:'Chris Brown'},
+{id:'dPhwbZBvW2o',t:'Go Crazy',a:'Chris Brown & Young Thug'},
+{id:'JXRN_LkCa_o',t:'Loyal',a:'Chris Brown'},
+{id:'3H17EqhzLdw',t:'W.A.Y.S.',a:'Jhene Aiko'},
+{id:'00bumpN0Mhw',t:'The Pressure',a:'Jhene Aiko'},
+{id:'6dvp6gVpA9A',t:'The Worst',a:'Jhene Aiko'},
+{id:'4NRXx6U8ABQ',t:'Blinding Lights',a:'The Weeknd'},
+{id:'h_D3VFfhvs4',t:'Smooth Criminal',a:'Michael Jackson'},
+{id:'1twUUM0KxDg',t:'Set Fire to the Rain',a:'Adele'},
+{id:'i_PYqIZoGvo',t:'Drugs N Hella Melodies',a:'Don Toliver ft. Kali Uchis'},
+],
+soul:[
+{id:'4TYv2PhG89A',t:'Smooth Operator',a:'Sade'},
+{id:'hDd2G_V1rzc',t:'Kiss from a Rose',a:'Seal'},
+{id:'_WcWHZc8s2I',t:'No Ordinary Love',a:'Sade'},
+{id:'NYz8xs163YU',t:'Is It a Crime',a:'Sade'},
+{id:'kcPc18SG6uA',t:'The Sweetest Taboo',a:'Sade'},
+{id:'C8QJmI_V3j4',t:'By Your Side',a:'Sade'},
+{id:'k1ljpLQ1V6Y',t:'Your Love Is King',a:'Sade'},
+{id:'kxNJV83EMJw',t:'Hang on to Your Love',a:'Sade'},
+{id:'NQSvb86a5cY',t:'Lady',a:'Fela Kuti'},
+{id:'Qj5x6pbJMyU',t:'Zombie',a:'Fela Kuti'},
+{id:'vvYxd35xFx8',t:'Shakara',a:'Fela Kuti'},
+{id:'kisTH3SFegc',t:'Water No Get Enemy',a:'Fela Kuti'},
+],
+vibes:[
+{id:'7wfYIMyS_dI',t:'Only Time',a:'Enya'},
+{id:'RB-RcX5DS5A',t:'The Scientist',a:'Coldplay'},
+{id:'XFkzRNyygfk',t:'Creep',a:'Radiohead'},
+{id:'k4V3Mo61fJM',t:'Fix You',a:'Coldplay'},
+{id:'fJ9rUzIMcZQ',t:'Bohemian Rhapsody',a:'Queen'},
+{id:'-0MQXbcw-co',t:'Wish You Were Here',a:'Pink Floyd'},
+{id:'EpVXH3Vm2wg',t:'My Foolish Heart',a:'Bill Evans Trio'},
+{id:'Nv2GgV34qIg',t:'Peace Piece',a:'Bill Evans'},
+{id:'iYYRH4apXDo',t:'Space Oddity',a:'David Bowie'},
+{id:'HyMm4rJemtI',t:'Ashes to Ashes',a:'David Bowie'},
+{id:'t365MuktYQs',t:'Starman',a:'David Bowie'},
+{id:'5u-KWa3tL-0',t:'Cats in the Cradle',a:'Harry Chapin'},
+],
+santana:[
+{id:'6Whgn_iE5uc',t:'Smooth',a:'Santana ft. Rob Thomas'},
+{id:'9wT1s96JIb0',t:'Black Magic Woman',a:'Santana'},
+{id:'nPLV7lGbmT4',t:'Maria Maria',a:'Santana ft. The Product G&B'},
+{id:'j5AUm_xaE9A',t:'Samba Pa Ti',a:'Santana'},
+{id:'Ot6pSrKT1oc',t:'Europa',a:'Santana'},
+{id:'JaaT_HRb4GU',t:'Soul Sacrifice',a:'Santana'},
+{id:'J7ATTjg7tpE',t:'Oye Como Va',a:'Santana'},
+{id:'gVPUAntzOl4',t:'Evil Ways',a:'Santana'},
+{id:'t6omUxqhG78',t:'Corazon Espinado',a:'Santana ft. Mana'},
+{id:'bQWOhPPYJkQ',t:'Flor de Luna (Moonflower)',a:'Santana'},
+{id:'J5OspxMTwis',t:'Breaking Down The Door',a:'Santana ft. Buika'},
+{id:'2wwfUEM3BWU',t:'Everybody Is Everything',a:'Santana'},
+],
+meditation:[
+{id:'w3aAKiZ0euE',t:'1 Minute Guided Meditation',a:'Ace Burns (Koinda)'},
+{id:'Pl80nemEKmI',t:'3 Minute Guided Meditation',a:'Ace Burns (Koinda)'},
+{id:'Ymllez2K7eg',t:'5 Minute Guided Meditation',a:'Ace Burns (Koinda)'},
+{id:'NWjLOX3_lh8',t:'Koinda Vol. 3 (Intro)',a:'Ace Burns'},
+{id:'nt3Ggo1CE3g',t:'May It Be',a:'Enya'},
+{id:'LTrk4X9ACtw',t:'Orinoco Flow',a:'Enya'},
+{id:'cuDDPF6vE6Y',t:'Trains and Winter Rains',a:'Enya'},
+{id:'LMpwWSFEvEY',t:'If I Could Be Where You Are',a:'Enya'},
+{id:'034jQiJiZXM',t:'Dangerous After Dark',a:'Lazerhawk'},
+{id:'eyZQUEMZlCU',t:'King of the Streets',a:'Lazerhawk'},
+{id:'7vJFJL63Fqw',t:'China Town',a:'Lazerhawk'},
+{id:'x1NAhlVRaZ4',t:'Overdrive',a:'Lazerhawk'},
+],
+workout:[
+{id:'6ONRf7h3Mdk',t:'SICKO MODE',a:'Travis Scott'},
+{id:'WrsFXgQk5UI',t:'XO TOUR Llif3',a:'Lil Uzi Vert'},
+{id:'uvUtXdM1vc0',t:'You Was Right',a:'Lil Uzi Vert'},
+{id:'HI-mXMr8glQ',t:'Stir Fry',a:'Migos'},
+{id:'meXPbvp3ldg',t:'Plain Jane',a:'A$AP Ferg'},
+{id:'2P7mvQQZK3Y',t:'Rubber Band Man',a:'A$AP Ferg ft. Cam\'ron'},
+{id:'28hYUZMufDg',t:'BOP',a:'DaBaby'},
+{id:'LPTlvQ1Zet0',t:'Ric Flair Drip',a:'Offset & Metro Boomin'},
+{id:'wuO4_P_8p-Q',t:'Father Stretch My Hands',a:'Kanye West'},
+{id:'bPjZmQAvk_8',t:'Hurricane',a:'Kanye West'},
+{id:'o7jsf2PeYB8',t:'Tell The Vision',a:'Pop Smoke ft. Kanye West'},
+{id:'szKxAdvlCCM',t:'X',a:'21 Savage ft. Future'},
+],
+skating:[
+{id:'0OfSyl9gkWM',t:'Show Out',a:'Kid Cudi ft. Skepta & Pop Smoke'},
+{id:'7xzU9Qqdqww',t:'Pursuit of Happiness',a:'Kid Cudi ft. MGMT'},
+{id:'s1-D8UOq7iA',t:'Moon Man & Slim Shady',a:'Kid Cudi ft. Eminem'},
+{id:'uQ_DHRI-Xp0',t:'THat Part',a:'ScHoolboy Q'},
+{id:'rEMsjeq43_U',t:'Man Of The Year',a:'ScHoolboy Q'},
+{id:'_L2vJEb6lVE',t:'Collard Greens',a:'ScHoolboy Q'},
+{id:'5_qAwMHhkwQ',t:'Numb Numb Juice',a:'ScHoolboy Q'},
+{id:'IxGvm6btP1A',t:'Fade',a:'Kanye West'},
+{id:'cwQgjq0mCdE',t:'I Love It',a:'Kanye West & Lil Pump'},
+{id:'5EpyN_6dqyk',t:'Timeless',a:'The Weeknd ft. Playboi Carti'},
+{id:'YlUKcNNmywk',t:'Californication',a:'Red Hot Chili Peppers'},
+{id:'ZbZSe6N_BXs',t:'Happy',a:'Pharrell Williams'},
+],
+};
+
+const TAB_NAMES={ace:'Ace Burns',drake:'Drizzy',bars:'Bars',heat:'Heat',queens:'Queens',afro:'Afro',smooth:'Smooth',soul:'Soul',vibes:'Vibes',santana:'Santana',meditation:'Meditate',workout:'Workout',skating:'Skating'};
+const TAB_ORDER=['ace','drake','bars','heat','queens','afro','smooth','soul','vibes','santana','meditation','workout','skating'];
+
+let cur='ace',idx=-1,yt=null,ready=false;
+let shuf=false,rep=false,timer=null,shufQ=[];
+let errSet=new Set(),retries=0;
+
+var hasAndroidBridge=(typeof AndroidBridge!=='undefined');
+function bridgeStateChange(s){if(hasAndroidBridge)try{AndroidBridge.onStateChange(s);}catch(e){}}
+function bridgeVideoInfo(id,t,a){if(hasAndroidBridge)try{AndroidBridge.onVideoInfo(id,t,a);}catch(e){}}
+function bridgeError(c){if(hasAndroidBridge)try{AndroidBridge.onError(c);}catch(e){}}
+function bridgeReady(){if(hasAndroidBridge)try{AndroidBridge.onPlayerReady();}catch(e){}}
+
+var player={
+playVideo:function(){if(yt)yt.playVideo();},pauseVideo:function(){if(yt)yt.pauseVideo();},
+seekTo:function(s,a){if(yt)yt.seekTo(s,a);},loadVideoById:function(id){if(yt)yt.loadVideoById({videoId:id,startSeconds:0});},
+getCurrentTime:function(){return yt?yt.getCurrentTime():0;},getDuration:function(){return yt?yt.getDuration():0;},
+getPlayerState:function(){return yt?yt.getPlayerState():-1;}
+};
+function nextTrack(){next();}
+function previousTrack(){prev();}
+
+function renderTabs(){
+document.getElementById('tabs').innerHTML=TAB_ORDER.map(function(k){
+return '<button class="tab'+(k===cur?' active':'')+'" onclick="switchPL(\''+k+'\')">'+TAB_NAMES[k]+'</button>';
+}).join('');
+}
+
+function renderPL(){
+var tracks=PL[cur];
+document.getElementById('pl').innerHTML=tracks.map(function(t,i){
+var broken=errSet.has(t.id);
+return '<div class="track'+(i===idx?' active':'')+(broken?' error':'')+'" onclick="play('+i+')" id="tr'+i+'">'+
+'<div class="t-thumb"><img src="'+T(t.id)+'" loading="lazy" alt=""></div>'+
+'<span class="t-num">'+(i+1)+'</span>'+
+'<div class="eq"><span></span><span></span><span></span></div>'+
+'<div class="t-info"><div class="t-title">'+t.t+'</div><div class="t-artist">'+t.a+'</div></div>'+
+'</div>';
+}).join('');
+}
+
+function switchPL(k){cur=k;idx=-1;retries=0;renderTabs();buildShuf();renderPL();}
+
+function play(i){
+var tracks=PL[cur];
+if(i<0||i>=tracks.length)return;
+idx=i;retries=0;
+var t=tracks[i];
+document.getElementById('npTitle').textContent=t.t;
+document.getElementById('npArtist').textContent=t.a;
+document.getElementById('npImg').src=T(t.id);
+renderPL();
+var el=document.getElementById('tr'+i);
+if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+if(ready){
+yt.loadVideoById({videoId:t.id,startSeconds:0});
+setTimeout(function(){try{yt.playVideo();}catch(e){}},300);
+setTimeout(function(){try{yt.playVideo();}catch(e){}},900);
+}
+setIcon(true);startTimer();stat('Loading...');
+bridgeVideoInfo(t.id,t.t,t.a);
+if('mediaSession' in navigator){
+navigator.mediaSession.metadata=new MediaMetadata({title:t.t,artist:t.a,album:'ACE PLAYER',artwork:[{src:T(t.id),sizes:'320x180',type:'image/jpeg'}]});
+navigator.mediaSession.setActionHandler('play',function(){togglePlay();});
+navigator.mediaSession.setActionHandler('pause',function(){togglePlay();});
+navigator.mediaSession.setActionHandler('nexttrack',function(){next();});
+navigator.mediaSession.setActionHandler('previoustrack',function(){prev();});
+}
+}
+
+function togglePlay(){
+if(!ready)return;
+var s=yt.getPlayerState();
+if(s===1){yt.pauseVideo();setIcon(false);stat('Paused');}
+else{yt.playVideo();setIcon(true);stat('Playing');}
+}
+
+function next(){
+var tracks=PL[cur];
+if(shuf){var si=shufQ.indexOf(idx);play(shufQ[(si+1)%shufQ.length]);}
+else{play((idx+1)%tracks.length);}
+}
+
+function prev(){
+if(ready&&yt.getCurrentTime&&yt.getCurrentTime()>3){yt.seekTo(0);return;}
+var tracks=PL[cur];
+if(shuf){var si=shufQ.indexOf(idx);play(shufQ[(si-1+shufQ.length)%shufQ.length]);}
+else{play((idx-1+tracks.length)%tracks.length);}
+}
+
+function toggleShuffle(){shuf=!shuf;document.getElementById('shufBtn').classList.toggle('on',shuf);if(shuf)buildShuf();}
+function toggleRepeat(){rep=!rep;document.getElementById('repBtn').classList.toggle('on',rep);}
+
+function buildShuf(){
+var n=PL[cur].length;shufQ=[];for(var i=0;i<n;i++)shufQ.push(i);
+for(var i=n-1;i>0;i--){var j=Math.random()*i|0;var tmp=shufQ[i];shufQ[i]=shufQ[j];shufQ[j]=tmp;}
+}
+
+function startTimer(){
+if(timer)clearInterval(timer);
+timer=setInterval(function(){
+if(!ready||!yt.getCurrentTime)return;
+var c=yt.getCurrentTime()||0,d=yt.getDuration()||1;
+var p=(c/d)*100;
+document.getElementById('progFill').style.width=p+'%';
+document.getElementById('progKnob').style.left=p+'%';
+document.getElementById('tNow').textContent=fmt(c);
+document.getElementById('tEnd').textContent=fmt(d);
+},500);
+}
+
+document.getElementById('progWrap').addEventListener('click',function(e){
+if(!ready)return;
+var r=e.currentTarget.getBoundingClientRect();
+yt.seekTo((e.clientX-r.left)/r.width*(yt.getDuration()||0),true);
+});
+
+var dragging=false;
+document.getElementById('progWrap').addEventListener('touchstart',function(){dragging=true;},{passive:true});
+document.getElementById('progWrap').addEventListener('touchmove',function(e){
+if(!dragging||!ready)return;
+var r=e.currentTarget.getBoundingClientRect();
+var p=Math.max(0,Math.min(1,(e.touches[0].clientX-r.left)/r.width));
+document.getElementById('progFill').style.width=(p*100)+'%';
+document.getElementById('progKnob').style.left=(p*100)+'%';
+},{passive:true});
+document.getElementById('progWrap').addEventListener('touchend',function(e){
+if(!dragging||!ready)return;dragging=false;
+var r=e.currentTarget.getBoundingClientRect();
+var p=Math.max(0,Math.min(1,(e.changedTouches[0].clientX-r.left)/r.width));
+yt.seekTo(p*(yt.getDuration()||0),true);
+},{passive:true});
+
+function fmt(s){if(!s||isNaN(s))return'0:00';s=Math.floor(s);return(s/60|0)+':'+(s%60<10?'0':'')+(s%60);}
+function stat(t){document.getElementById('status').textContent=t;}
+function setIcon(playing){
+document.getElementById('ppIco').innerHTML=playing?
+'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>':'<path d="M8 5v14l11-7z"/>';
+}
+
+function autoPlayFirst(){if(idx===-1&&PL[cur].length>0)play(0);}
+
+var tag=document.createElement('script');
+tag.src='https://www.youtube.com/iframe_api';
+document.head.appendChild(tag);
+
+window.onYouTubeIframeAPIReady=function(){
+yt=new YT.Player('yt',{
+width:'320',height:'180',
+playerVars:{autoplay:1,controls:0,disablekb:1,fs:0,modestbranding:1,rel:0,playsinline:1,enablejsapi:1},
+events:{
+onReady:function(){ready=true;document.getElementById('loader').classList.add('hide');stat('Tap a track');bridgeReady();autoPlayFirst();},
+onStateChange:function(e){
+bridgeStateChange(e.data);
+if(e.data===1){setIcon(true);stat('Playing');retries=0;}
+if(e.data===2){setIcon(false);stat('Paused');}
+if(e.data===0){if(rep)play(idx);else next();}
+if(e.data===-1&&idx>=0){setTimeout(function(){try{yt.playVideo();}catch(e){}},500);}
+},
+onError:function(e){
+bridgeError(e.data);
+var tracks=PL[cur];
+if(idx>=0&&idx<tracks.length){errSet.add(tracks[idx].id);renderPL();}
+retries++;stat('Blocked — skipping');
+if(retries<tracks.length){setTimeout(function(){next();},800);}
+else{stat('All tracks blocked');retries=0;}
+}
+}
+});
+};
+
+buildShuf();renderTabs();renderPL();
+</script>
+</body>
+</html>
