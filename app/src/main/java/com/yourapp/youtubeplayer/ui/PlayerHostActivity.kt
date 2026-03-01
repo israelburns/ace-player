@@ -2,9 +2,11 @@ package com.yourapp.youtubeplayer.ui
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -74,6 +76,9 @@ class PlayerHostActivity : AppCompatActivity() {
 
         // Load from GCP server — YouTube IFrame API requires HTTPS origin
         webView.loadUrl("https://ace-taskmaster.duckdns.org/player")
+
+        // Request battery optimization exemption so playback survives screen off
+        requestBatteryExemption()
 
         // Listen for commands from PlaybackService (e.g. Android Auto controls)
         PlaybackService.commandListener = { command ->
@@ -169,6 +174,24 @@ class PlayerHostActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("BatteryLife")
+    private fun requestBatteryExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                intent.data = Uri.parse("package:$packageName")
+                try { startActivity(intent) } catch (_: Exception) {}
+            }
+        }
+    }
+
+    // Move to background instead of closing when user presses back
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        moveTaskToBack(true)
+    }
+
     // DO NOT pause WebView when activity goes to background — keep audio alive
     override fun onPause() {
         super.onPause()
@@ -180,11 +203,15 @@ class PlayerHostActivity : AppCompatActivity() {
         webView.onResume()
     }
 
+    // Do NOT destroy WebView when task is removed — keep audio alive
     override fun onDestroy() {
         positionUpdateJob?.cancel()
         PlaybackService.commandListener = null
         wakeLock?.let { if (it.isHeld) it.release() }
-        webView.destroy()
+        // Only destroy WebView if app is truly finishing (not just being sent to background)
+        if (isFinishing) {
+            webView.destroy()
+        }
         super.onDestroy()
     }
 }

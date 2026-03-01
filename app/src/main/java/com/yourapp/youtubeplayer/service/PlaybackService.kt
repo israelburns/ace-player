@@ -255,6 +255,11 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    // Keep service alive when user swipes app away
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Do NOT call super or stopSelf — keep playing
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         return mediaLibrarySession
     }
