@@ -58,6 +58,15 @@ body{background:#08080c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,
 .eq span:nth-child(3){animation-delay:0.3s}
 @keyframes eq{0%{height:3px}100%{height:14px}}
 #ytWrap{position:fixed;bottom:0;right:0;width:2px;height:2px;overflow:hidden;opacity:0.01;z-index:-1}
+.splash{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;transition:opacity 0.6s}
+.splash.hide{opacity:0;pointer-events:none}
+.splash-logo{width:140px;height:140px;opacity:0;animation:logoIn 1.2s ease-out 0.3s forwards}
+.splash-text{font-size:18px;color:#c8a54e;letter-spacing:8px;font-weight:700;margin-top:24px;opacity:0;animation:textIn 0.8s ease-out 1.2s forwards}
+.splash-line{width:60px;height:2px;background:linear-gradient(90deg,transparent,#c8a54e,transparent);margin-top:12px;opacity:0;animation:textIn 0.8s ease-out 1.5s forwards}
+@keyframes logoIn{0%{opacity:0;transform:scale(0.5)}60%{opacity:1;transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
+@keyframes textIn{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes logoPulse{0%,100%{filter:drop-shadow(0 0 8px rgba(200,165,78,0.3))}50%{filter:drop-shadow(0 0 20px rgba(200,165,78,0.6))}}
+.splash-logo.pulse{animation:logoPulse 1.5s ease-in-out infinite}
 .loading{position:fixed;inset:0;background:rgba(8,8,12,0.97);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity 0.5s}
 .loading.hide{opacity:0;pointer-events:none}
 .spinner{width:44px;height:44px;border:3px solid #1a1a2a;border-top-color:#c8a54e;border-radius:50%;animation:spin 0.7s linear infinite}
@@ -99,6 +108,17 @@ body{background:#08080c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,
 <div class="tab-row" id="tabs"></div>
 <div class="playlist" id="pl"></div>
 <div id="ytWrap"><div id="yt"></div></div>
+<div class="splash" id="splash">
+<svg class="splash-logo" id="splashLogo" viewBox="0 0 200 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M100 10 L30 200 Q45 210 55 195 L75 145 Q90 125 100 125 Q110 125 125 145 L145 195 Q155 210 170 200 L100 10Z" fill="#C8A54E"/>
+<path d="M100 85 Q80 120 68 155 Q85 175 100 175 Q115 175 132 155 Q120 120 100 85Z" fill="#000"/>
+<path d="M100 50 L100 55" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
+<div class="splash-text" id="splashText">ACE PLAYER</div>
+<div class="splash-credit" id="splashCredit" style="font-size:13px;color:#888;letter-spacing:3px;margin-top:20px;opacity:0">MADE BY ISRAEL ADAM BURNS</div>
+<div class="splash-line"></div>
+</div>
+<div id="splashChime" style="position:fixed;width:1px;height:1px;overflow:hidden;z-index:-1"></div>
 <div class="loading" id="loader"><div class="spinner"></div><p>LOADING</p></div>
 
 <script>
@@ -493,6 +513,41 @@ document.getElementById('ppIco').innerHTML=playing?
 
 function autoPlayFirst(){if(idx===-1&&PL[cur].length>0)play(0);}
 
+function runSplashIntro(){
+var sp=document.getElementById('splash');
+var logo=document.getElementById('splashLogo');
+var credit=document.getElementById('splashCredit');
+// Play chime — first 4 seconds of "Get Out While You Can"
+var chimePlayer=null;
+try{
+chimePlayer=new YT.Player('splashChime',{width:'1',height:'1',
+videoId:'F1gh3dN6y8I',
+playerVars:{autoplay:1,controls:0,start:0,end:4,playsinline:1,enablejsapi:1},
+events:{onReady:function(e){e.target.setVolume(80);e.target.playVideo();}}
+});
+}catch(e){}
+// Phase 1: Logo already animating in via CSS (0-1.5s)
+// Phase 2: Show credit at 1.8s
+setTimeout(function(){credit.style.transition='opacity 0.8s';credit.style.opacity='1';},1800);
+// Phase 3: Wink — logo briefly dims then flashes bright at 3s
+setTimeout(function(){
+logo.style.transition='opacity 0.15s';
+logo.style.opacity='0.2';
+setTimeout(function(){
+logo.style.transition='opacity 0.1s';
+logo.style.opacity='1';
+logo.style.filter='drop-shadow(0 0 30px rgba(200,165,78,0.9))';
+setTimeout(function(){logo.classList.add('pulse');},200);
+},150);
+},3000);
+// Phase 4: Fade out splash at 4.5s, start player
+setTimeout(function(){
+sp.classList.add('hide');
+try{chimePlayer.destroy();}catch(e){}
+setTimeout(function(){sp.remove();stat('Tap a track');autoPlayFirst();},600);
+},4500);
+}
+
 var tag=document.createElement('script');
 tag.src='https://www.youtube.com/iframe_api';
 document.head.appendChild(tag);
@@ -502,7 +557,7 @@ yt=new YT.Player('yt',{
 width:'320',height:'180',
 playerVars:{autoplay:1,controls:0,disablekb:1,fs:0,modestbranding:1,rel:0,playsinline:1,enablejsapi:1},
 events:{
-onReady:function(){ready=true;document.getElementById('loader').classList.add('hide');stat('Tap a track');bridgeReady();autoPlayFirst();},
+onReady:function(){ready=true;document.getElementById('loader').classList.add('hide');runSplashIntro();bridgeReady();},
 onStateChange:function(e){
 bridgeStateChange(e.data);
 if(e.data===1){setIcon(true);stat('Playing');retries=0;}
