@@ -7,9 +7,9 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#08080c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100dvh;overflow:hidden;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;position:relative}
-.bg-watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:280px;height:280px;opacity:0;z-index:0;pointer-events:none;transition:opacity 1.5s}
-.bg-watermark img{width:100%;height:100%;object-fit:contain;filter:brightness(0.3)}
-.bg-watermark.show{opacity:0.06}
+
+
+
 ::-webkit-scrollbar{width:3px}
 ::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
 .top-bar{background:#0d0d14;padding:10px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1a1a2a;flex-shrink:0}
@@ -119,9 +119,9 @@ body{background:#08080c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,
 <div class="tab-row" id="tabs"></div>
 <div class="playlist" id="pl"></div>
 <div id="ytWrap"><div id="yt"></div></div>
-<div class="bg-watermark" id="bgWatermark"><img src="https://ace-taskmaster.duckdns.org/ace_logo.jpg" alt=""></div>
+
 <div class="splash" id="splash">
-<img class="splash-logo" id="splashLogo" src="https://ace-taskmaster.duckdns.org/ace_logo.jpg" alt="A" style="border-radius:12px">
+<img class="splash-logo" id="splashLogo" src="data:image/jpeg;base64,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" alt="A" style="border-radius:12px">
 <div class="splash-text" id="splashText">ACE PLAYER</div>
 <div class="splash-credit" id="splashCredit" style="font-size:13px;color:#888;letter-spacing:3px;margin-top:20px;opacity:0">MADE BY ISRAEL ADAM BURNS</div>
 <div class="splash-line"></div>
@@ -339,44 +339,46 @@ skating:[
 {id:'ZbZSe6N_BXs',t:'Happy',a:'Pharrell Williams'},
 ],
 top40:[
-{id:'MkViknOdMas',t:'Mad Stalkers',a:'21 Savage'},
+{id:'ETPBnOlNeOw',t:'Mad Stalkers',a:'21 Savage'},
 {id:'ogXC9YU_hmM',t:'Black Berry Whine',a:'Ace Burns'},
 {id:'9R2HNOSVIF0',t:'Boss Fit',a:'Ace Burns'},
 {id:'SlW7cZC4-Hw',t:"That's How You Feel",a:'Drake'},
 {id:'NV-3s2wwC8c',t:'Look Alive',a:'BlocBoy JB ft. Drake'},
-{id:'LuvrBUewTjc',t:'Land of the Kush',a:'Ace Burns ft. YokeeGilla'},
 {id:'qlkZ70r56ck',t:'KMT',a:'Drake ft. Giggs'},
 {id:'C3oPcMlMaZg',t:'Free Smoke',a:'Drake'},
-{id:'-r4eiliwfQg',t:'Get in Touch (Pop Off)',a:'Ace Burns'},
-{id:'43QYeYqwO4s',t:'Wacoinda',a:'Ace Burns'},
-{id:'gcjTb7St5gY',t:'Wetin Dey Boot?',a:'Ace Burns'},
-{id:'tKkbE01AoRQ',t:'Going Bad',a:'Meek Mill ft. Drake'},
-{id:'S-sJp1FfIJc',t:'Bank Account',a:'21 Savage'},
-{id:'Ilg0piHhEOM',t:'Feed Me Dope',a:'Future'},
-{id:'_EHsOy_NKUQ',t:'BUTTERFLY EFFECT',a:'Travis Scott'},
-{id:'ZVuwP1nybP4',t:'Undepress Me',a:'Ace Burns'},
-{id:'i1gyGfTcqdg',t:'Watch Your Step',a:'Ace Burns'},
-{id:'aqgYVt2TQXQ',t:'MotorSport',a:'Migos ft. Nicki Minaj & Cardi B'},
+{id:'qwxt7sDScvE',t:'Going Bad',a:'Meek Mill ft. Drake'},
+{id:'H1KBHFXm2Bg',t:'Bank Account',a:'21 Savage'},
+{id:'FFZljiPZcRg',t:'Feed Me Dope',a:'Future'},
+{id:'_EyZUTDAH0U',t:'BUTTERFLY EFFECT',a:'Travis Scott'},
+{id:'9v_rtaye2yY',t:'MotorSport',a:'Migos ft. Nicki Minaj & Cardi B'},
 {id:'xvZqHgFz51I',t:'Mask Off',a:'Future'},
-{id:'sXcJEFp09p0',t:'Drugs N Hella Melodies',a:'Don Toliver ft. Kali Uchis'},
-{id:'LPTlvQ1ZETY',t:'Ric Flair Drip',a:'Offset & Metro Boomin'},
+{id:'i_PYqIZoGvo',t:'Drugs N Hella Melodies',a:'Don Toliver ft. Kali Uchis'},
+{id:'LPTlvQ1Zet0',t:'Ric Flair Drip',a:'Offset & Metro Boomin'},
 {id:'UEcAPvoSe_8',t:'Sip (Alcohol)',a:'Joeboy'},
-{id:'LQ92bBVjIU8',t:'Buga (Lo Lo Lo)',a:'Kizz Daniel'},
-{id:'r0Lzz0ZGxhI',t:'Who Shot Ya?',a:'The Notorious B.I.G.'},
+{id:'bLF90M96m2Q',t:'Buga (Lo Lo Lo)',a:'Kizz Daniel'},
+{id:'U4Md8ZGtUN8',t:'Who Shot Ya?',a:'The Notorious B.I.G.'},
 {id:'9nV9GNjXFDo',t:'Real Rich',a:'Wiz Khalifa ft. Gucci Mane'},
-{id:'K0ibBPhiaG0',t:'All The Stars',a:'Kendrick Lamar & SZA'},
+{id:'JQbjS0_ZfJ0',t:'All The Stars',a:'Kendrick Lamar ft. SZA'},
 {id:'phr1pOFK1V8',t:'Bounce Back',a:'Big Sean'},
-{id:'NKFqfFMBRRo',t:'Plain Jane',a:'A$AP Ferg'},
-{id:'K3S3HXHEKL8',t:'Girlfriend',a:'Ruger'},
+{id:'meXPbvp3ldg',t:'Plain Jane',a:'A$AP Ferg'},
+{id:'7M2Gps9xR8g',t:'Girlfriend',a:'Ruger'},
 {id:'4LfJnj66HVQ',t:'Gucci Gang',a:'Lil Pump'},
 {id:'0OfSyl9gkWM',t:'Show Out',a:'Kid Cudi ft. Skepta & Pop Smoke'},
 {id:'RmYf6qA5QIY',t:'Bent',a:'41 ft. Kyle Richh'},
 {id:'P3iLo_JI9oY',t:'Watch',a:'Travis Scott ft. Lil Uzi Vert & Kanye'},
 {id:'rIhx2wZ8jnA',t:"I'm Upset",a:'Drake'},
-{id:'kfcBCDIRNcQ',t:'Chun-Li',a:'Nicki Minaj'},
+{id:'Wpm07-BGJnE',t:'Chun-Li',a:'Nicki Minaj'},
 {id:'nCbjK4259RM',t:'Maradona',a:'Niniola'},
 {id:'3CxtK7-XtE0',t:'POPSTAR',a:'DJ Khaled ft. Drake'},
-{id:'dQw5ep_kBjg',t:'Rubber Band Man',a:'A$AP Ferg ft. Cam\'ron'},
+{id:'2P7mvQQZK3Y',t:'Rubber Band Man',a:'A$AP Ferg ft. Cam\'ron'},
+{id:'H58vbez_m4E',t:'Not Like Us',a:'Kendrick Lamar'},
+{id:'hsm4poTWjMs',t:'WAP',a:'Cardi B ft. Megan Thee Stallion'},
+{id:'oorVWW9ywG0',t:'Dior',a:'Pop Smoke'},
+{id:'6ONRf7h3Mdk',t:'SICKO MODE',a:'Travis Scott'},
+{id:'WrsFXgQk5UI',t:'XO TOUR Llif3',a:'Lil Uzi Vert'},
+{id:'dNt1QR1ecuM',t:'Charm',a:'Rema'},
+{id:'fJ9rUzIMcZQ',t:'Bohemian Rhapsody',a:'Queen'},
+{id:'6Whgn_iE5uc',t:'Smooth',a:'Santana ft. Rob Thomas'},
 ],
 };
 
@@ -526,30 +528,23 @@ function runSplashIntro(){
 var sp=document.getElementById('splash');
 var logo=document.getElementById('splashLogo');
 var credit=document.getElementById('splashCredit');
-var wm=document.getElementById('bgWatermark');
 var chime=new Audio('https://ace-taskmaster.duckdns.org/intro.mp3');
 chime.volume=0.8;
 try{chime.play();}catch(e){}
 // Phase 1: Logo animates in via CSS (0-1.5s)
 // Phase 2: "Made by Israel Adam Burns" at 1.8s
 setTimeout(function(){credit.style.transition='opacity 0.8s';credit.style.opacity='1';},1800);
-// Phase 3: Wink — logo dims then flashes bright at 3s
+// Phase 3: Flash — bright gold glow at 3s
 setTimeout(function(){
-logo.style.transition='opacity 0.15s';
-logo.style.opacity='0.2';
-setTimeout(function(){
-logo.style.transition='opacity 0.1s';
-logo.style.opacity='1';
-logo.style.filter='drop-shadow(0 0 30px rgba(200,165,78,0.9))';
-},150);
+logo.style.filter='drop-shadow(0 0 40px rgba(200,165,78,1)) brightness(1.3)';
+setTimeout(function(){logo.style.filter='';},400);
 },3000);
-// Phase 4: Fade splash out, A stays as background watermark
+// Phase 4: Splash out — done
 setTimeout(function(){
 sp.classList.add('hide');
 chime.pause();
-wm.classList.add('show');
 setTimeout(function(){sp.remove();stat('Tap a track');autoPlayFirst();},600);
-},5000);
+},4500);
 }
 
 // KITT WAVE BARS
@@ -592,6 +587,30 @@ kittBars[i].classList.remove('glow');
 kittEl.classList.add('idle');
 }
 
+// Keep audio session alive when screen is off (prevents browser from suspending audio)
+var silentCtx=null;
+function keepAudioAlive(){
+if(silentCtx)return;
+try{
+silentCtx=new(window.AudioContext||window.webkitAudioContext)();
+var osc=silentCtx.createOscillator();
+var gain=silentCtx.createGain();
+gain.gain.value=0.001;
+osc.connect(gain);
+gain.connect(silentCtx.destination);
+osc.start();
+}catch(e){}
+}
+// Resume audio context when page becomes visible again
+document.addEventListener('visibilitychange',function(){
+if(!document.hidden&&silentCtx&&silentCtx.state==='suspended'){silentCtx.resume();}
+if(!document.hidden&&yt&&yt.getPlayerState&&yt.getPlayerState()===2){
+// If player was paused by browser suspension, resume it
+var wasPlaying=document.getElementById('ppIco').innerHTML.indexOf('M6 19')>-1;
+if(wasPlaying)try{yt.playVideo();}catch(e){}
+}
+});
+
 var tag=document.createElement('script');
 tag.src='https://www.youtube.com/iframe_api';
 document.head.appendChild(tag);
@@ -604,8 +623,8 @@ events:{
 onReady:function(){ready=true;document.getElementById('loader').classList.add('hide');runSplashIntro();bridgeReady();},
 onStateChange:function(e){
 bridgeStateChange(e.data);
-if(e.data===1){setIcon(true);stat('Playing');retries=0;kittActivate();}
-if(e.data===2){setIcon(false);stat('Paused');kittDeactivate();}
+if(e.data===1){setIcon(true);stat('Playing');retries=0;kittActivate();if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';keepAudioAlive();}
+if(e.data===2){setIcon(false);stat('Paused');kittDeactivate();if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
 if(e.data===0){if(rep)play(idx);else next();}
 if(e.data===-1&&idx>=0){setTimeout(function(){try{yt.playVideo();}catch(e){}},500);}
 },

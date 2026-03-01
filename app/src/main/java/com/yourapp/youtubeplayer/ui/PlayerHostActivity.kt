@@ -12,6 +12,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import com.yourapp.youtubeplayer.R
 import com.yourapp.youtubeplayer.service.PlaybackService
@@ -62,6 +63,17 @@ class PlayerHostActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             setRenderPriority(WebSettings.RenderPriority.HIGH)
         }
+
+        // CRITICAL: Tell system to keep WebView renderer alive even when activity not visible
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            webView.setRendererPriorityPolicy(
+                WebView.RENDERER_PRIORITY_IMPORTANT,
+                false  // false = do NOT bind to activity visibility
+            )
+        }
+
+        // Keep screen on (dimmed) to prevent WebView audio from being killed
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         webView.addJavascriptInterface(PlayerBridge(), "AndroidBridge")
 
@@ -196,6 +208,13 @@ class PlayerHostActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         // Intentionally NOT calling webView.onPause() to keep audio playing
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Samsung aggressively pauses WebView in onStop — explicitly resume it
+        webView.onResume()
+        webView.evaluateJavascript("if(yt&&yt.getPlayerState()===2)yt.playVideo();", null)
     }
 
     override fun onResume() {
