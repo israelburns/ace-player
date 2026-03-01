@@ -5,7 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -19,11 +23,19 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.yourapp.youtubeplayer.R
 import com.yourapp.youtubeplayer.player.StateProxyPlayer
 import com.yourapp.youtubeplayer.ui.PlayerHostActivity
+import java.net.URL
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class PlaybackService : MediaLibraryService() {
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private lateinit var stateProxyPlayer: StateProxyPlayer
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+    private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
 
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "playback_channel"
@@ -33,8 +45,8 @@ class PlaybackService : MediaLibraryService() {
         var currentCommand: PlayerCommand? = null
         var commandListener: ((PlayerCommand) -> Unit)? = null
 
-        // Static ref for activity to push state updates
         var instance: PlaybackService? = null
+        var autoConnected = false
     }
 
     sealed class PlayerCommand {
@@ -44,18 +56,20 @@ class PlaybackService : MediaLibraryService() {
         object Previous : PlayerCommand()
         data class Seek(val positionMs: Long) : PlayerCommand()
         data class LoadVideo(val videoId: String) : PlayerCommand()
+        object AutoPlay : PlayerCommand()
     }
 
-    // Hardcoded playlist names matching the HTML
     private val playlistNames = listOf(
-        "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
-        "Afro", "Smooth", "Soul", "Vibes", "Santana"
+        "Top 40", "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
+        "Afro", "Smooth", "Soul", "Vibes", "Santana",
+        "Meditate", "Workout", "Skating"
     )
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         createNotificationChannel()
+        acquireWakeLocks()
 
         stateProxyPlayer = StateProxyPlayer(applicationContext)
 
@@ -79,6 +93,19 @@ class PlaybackService : MediaLibraryService() {
                 ): MediaSession.ConnectionResult {
                     val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().build()
                     val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon().build()
+
+                    // Auto-play when Android Auto connects
+                    val packageName = controller.packageName
+                    if (packageName.contains("android.auto") ||
+                        packageName.contains("car") ||
+                        packageName.contains("automotive") ||
+                        packageName.contains("media.session")) {
+                        if (!autoConnected) {
+                            autoConnected = true
+                            sendCommandToActivity(PlayerCommand.AutoPlay)
+                        }
+                    }
+
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(sessionCommands)
                         .setAvailablePlayerCommands(playerCommands)
@@ -119,9 +146,9 @@ class PlaybackService : MediaLibraryService() {
                                 .setMediaMetadata(
                                     MediaMetadata.Builder()
                                         .setTitle(name)
-                                        .setIsPlayable(false)
-                                        .setIsBrowsable(true)
-                                        .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS)
+                                        .setIsPlayable(true)
+                                        .setIsBrowsable(false)
+                                        .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
                                         .build()
                                 )
                                 .build()
@@ -134,10 +161,44 @@ class PlaybackService : MediaLibraryService() {
                         LibraryResult.ofItemList(ImmutableList.of(), params)
                     )
                 }
+
+                override fun onMediaButtonEvent(
+                    session: MediaSession,
+                    controllerInfo: MediaSession.ControllerInfo,
+                    intent: Intent
+                ): Boolean {
+                    // Auto-play on media button from car
+                    if (!autoConnected) {
+                        autoConnected = true
+                        sendCommandToActivity(PlayerCommand.AutoPlay)
+                        return true
+                    }
+                    return super.onMediaButtonEvent(session, controllerInfo, intent)
+                }
             }
         ).build()
 
         startForeground(NOTIFICATION_ID, createNotification())
+    }
+
+    private fun acquireWakeLocks() {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "AcePlayer::PlaybackWakeLock"
+        ).apply { acquire() }
+
+        val wm = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+        @Suppress("DEPRECATION")
+        wifiLock = wm.createWifiLock(
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+            "AcePlayer::WifiLock"
+        ).apply { acquire() }
+    }
+
+    private fun releaseWakeLocks() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wifiLock?.let { if (it.isHeld) it.release() }
     }
 
     private fun createNotificationChannel() {
@@ -180,6 +241,18 @@ class PlaybackService : MediaLibraryService() {
 
     fun updateMetadata(title: String?, artist: String?, thumbnailUrl: String?) {
         stateProxyPlayer.updateMetadata(title, artist, thumbnailUrl)
+        // Load artwork bitmap in background for Android Auto
+        if (thumbnailUrl != null) {
+            serviceScope.launch {
+                try {
+                    val url = URL(thumbnailUrl)
+                    val bitmap = BitmapFactory.decodeStream(url.openStream())
+                    if (bitmap != null) {
+                        stateProxyPlayer.updateArtworkBitmap(bitmap)
+                    }
+                } catch (_: Exception) { }
+            }
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
@@ -188,6 +261,8 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         instance = null
+        autoConnected = false
+        releaseWakeLocks()
         mediaLibrarySession?.run {
             player.release()
             release()

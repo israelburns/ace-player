@@ -1,18 +1,14 @@
 package com.yourapp.youtubeplayer.player
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import java.io.ByteArrayOutputStream
 
-/**
- * A minimal Player wrapper that holds state for the MediaSession.
- * It doesn't play anything — the WebView handles actual playback.
- * We use SimpleBasePlayer from Media3 which provides all the boilerplate.
- */
 @UnstableApi
 class StateProxyPlayer(private val context: Context) : androidx.media3.common.SimpleBasePlayer(context.mainLooper) {
 
@@ -21,6 +17,7 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
     private var currentTitle: String? = null
     private var currentArtist: String? = null
     private var currentArtworkUri: Uri? = null
+    private var currentArtworkData: ByteArray? = null
 
     fun updatePlaybackState(playing: Boolean, position: Long) {
         isPlaying = playing
@@ -35,14 +32,27 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
         invalidateState()
     }
 
+    fun updateArtworkBitmap(bitmap: Bitmap) {
+        val stream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+        currentArtworkData = stream.toByteArray()
+        invalidateState()
+    }
+
     override fun getState(): State {
         val mediaItemBuilder = MediaItemData.Builder(/* uid= */ "ace_player_current")
 
-        val metadata = MediaMetadata.Builder()
+        val metadataBuilder = MediaMetadata.Builder()
             .setTitle(currentTitle ?: "ACE PLAYER")
             .setArtist(currentArtist ?: "")
             .setArtworkUri(currentArtworkUri)
-            .build()
+
+        // Set artwork bitmap data for Android Auto (URI alone doesn't work in car)
+        if (currentArtworkData != null) {
+            metadataBuilder.setArtworkData(currentArtworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+        }
+
+        val metadata = metadataBuilder.build()
 
         mediaItemBuilder
             .setMediaItem(

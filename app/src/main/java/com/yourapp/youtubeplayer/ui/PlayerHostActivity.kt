@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -24,11 +25,20 @@ class PlayerHostActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
     private var positionUpdateJob: Job? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var playerReady = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player_host)
+
+        // Acquire a partial wake lock to keep CPU alive during playback
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "AcePlayer::ActivityWakeLock"
+        ).apply { acquire() }
 
         // Start the PlaybackService for media session / notification / Android Auto
         val serviceIntent = Intent(this, PlaybackService::class.java)
@@ -44,8 +54,11 @@ class PlayerHostActivity : AppCompatActivity() {
             javaScriptEnabled = true
             mediaPlaybackRequiresUserGesture = false
             domStorageEnabled = true
-            cacheMode = WebSettings.LOAD_NO_CACHE
+            cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            // Keep WebView alive in background
+            @Suppress("DEPRECATION")
+            setRenderPriority(WebSettings.RenderPriority.HIGH)
         }
 
         webView.addJavascriptInterface(PlayerBridge(), "AndroidBridge")
@@ -58,9 +71,6 @@ class PlayerHostActivity : AppCompatActivity() {
         }
 
         webView.webChromeClient = WebChromeClient()
-
-        // Enable WebView debugging for troubleshooting
-        WebView.setWebContentsDebuggingEnabled(true)
 
         // Load from GCP server — YouTube IFrame API requires HTTPS origin
         webView.loadUrl("https://ace-taskmaster.duckdns.org/player")
@@ -97,6 +107,20 @@ class PlayerHostActivity : AppCompatActivity() {
                     "if(yt)yt.loadVideoById('${command.videoId}');", null
                 )
             }
+            is PlaybackService.PlayerCommand.AutoPlay -> {
+                // Auto-play first track when Android Auto connects
+                if (playerReady) {
+                    webView.evaluateJavascript("autoPlayFirst();", null)
+                } else {
+                    // Queue it — will fire when player ready
+                    activityScope.launch {
+                        while (!playerReady) { delay(500L) }
+                        runOnUiThread {
+                            webView.evaluateJavascript("autoPlayFirst();", null)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -120,7 +144,7 @@ class PlayerHostActivity : AppCompatActivity() {
     inner class PlayerBridge {
         @JavascriptInterface
         fun onPlayerReady() {
-            // Player is initialized
+            playerReady = true
         }
 
         @JavascriptInterface
@@ -145,9 +169,21 @@ class PlayerHostActivity : AppCompatActivity() {
         }
     }
 
+    // DO NOT pause WebView when activity goes to background — keep audio alive
+    override fun onPause() {
+        super.onPause()
+        // Intentionally NOT calling webView.onPause() to keep audio playing
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+    }
+
     override fun onDestroy() {
         positionUpdateJob?.cancel()
         PlaybackService.commandListener = null
+        wakeLock?.let { if (it.isHeld) it.release() }
         webView.destroy()
         super.onDestroy()
     }
