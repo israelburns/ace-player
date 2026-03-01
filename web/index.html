@@ -128,6 +128,8 @@ ace:[
 {id:'ogXC9YU_hmM',t:'Black Berry Whine',a:'Ace Burns'},
 {id:'9R2HNOSVIF0',t:'Boss Fit',a:'Ace Burns'},
 {id:'LuvrBUewTjc',t:'Land of the Kush',a:'Ace Burns ft. YokeeGilla'},
+{id:'3jHTVGjUlY8',t:"YOU'RE THE FUCKING TERRORIST",a:'Ace Burns'},
+{id:'eUzvoWkLLME',t:"YOU'RE THE FUCKING TERRORIST (Intro)",a:'Ace Burns'},
 {id:'-r4eiliwfQg',t:'Get in Touch (Pop Off)',a:'Ace Burns'},
 {id:'43QYeYqwO4s',t:'Wacoinda',a:'Ace Burns'},
 {id:'gcjTb7St5gY',t:'Wetin Dey Boot?',a:'Ace Burns'},
@@ -517,19 +519,14 @@ function runSplashIntro(){
 var sp=document.getElementById('splash');
 var logo=document.getElementById('splashLogo');
 var credit=document.getElementById('splashCredit');
-// Play chime — first 4 seconds of "Get Out While You Can"
-var chimePlayer=null;
-try{
-chimePlayer=new YT.Player('splashChime',{width:'1',height:'1',
-videoId:'F1gh3dN6y8I',
-playerVars:{autoplay:1,controls:0,start:0,end:4,playsinline:1,enablejsapi:1},
-events:{onReady:function(e){e.target.setVolume(80);e.target.playVideo();}}
-});
-}catch(e){}
-// Phase 1: Logo already animating in via CSS (0-1.5s)
-// Phase 2: Show credit at 1.8s
+// Play intro chime MP3
+var chime=new Audio('https://ace-taskmaster.duckdns.org/intro.mp3');
+chime.volume=0.8;
+try{chime.play();}catch(e){}
+// Phase 1: Logo animates in via CSS (0-1.5s)
+// Phase 2: Show "Made by Israel Adam Burns" at 1.8s
 setTimeout(function(){credit.style.transition='opacity 0.8s';credit.style.opacity='1';},1800);
-// Phase 3: Wink — logo briefly dims then flashes bright at 3s
+// Phase 3: Wink — logo dims then flashes bright at 3s
 setTimeout(function(){
 logo.style.transition='opacity 0.15s';
 logo.style.opacity='0.2';
@@ -540,12 +537,12 @@ logo.style.filter='drop-shadow(0 0 30px rgba(200,165,78,0.9))';
 setTimeout(function(){logo.classList.add('pulse');},200);
 },150);
 },3000);
-// Phase 4: Fade out splash at 4.5s, start player
+// Phase 4: Fade out splash at 5s, start player
 setTimeout(function(){
 sp.classList.add('hide');
-try{chimePlayer.destroy();}catch(e){}
+chime.pause();
 setTimeout(function(){sp.remove();stat('Tap a track');autoPlayFirst();},600);
-},4500);
+},5000);
 }
 
 var tag=document.createElement('script');
