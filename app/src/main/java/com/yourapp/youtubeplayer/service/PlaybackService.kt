@@ -61,7 +61,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private val playlistNames = listOf(
-        "Top 40", "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
+        "Top 40", "Today's Hits", "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
         "Afro", "Smooth", "Soul", "Vibes", "Santana",
         "Meditate", "Workout", "Skating", "Oldies",
         "Unexpected", "Emerging", "Caribbean"
@@ -69,7 +69,7 @@ class PlaybackService : MediaLibraryService() {
 
     // Representative YouTube video IDs for playlist artwork (Android Auto icons)
     private val playlistThumbnails = listOf(
-        "ETPBnOlNeOw", "ogXC9YU_hmM", "V7UgPHjN9qE", "H58vbez_m4E",
+        "ETPBnOlNeOw", "NYH6Oa4PXlY", "ogXC9YU_hmM", "V7UgPHjN9qE", "H58vbez_m4E",
         "ETPBnOlNeOw", "hsm4poTWjMs", "dNt1QR1ecuM", "Z9eMk051dYg",
         "4TYv2PhG89A", "7wfYIMyS_dI", "6Whgn_iE5uc", "w3aAKiZ0euE",
         "6ONRf7h3Mdk", "0OfSyl9gkWM", "7ll7ocQbH_k",
@@ -94,6 +94,16 @@ class PlaybackService : MediaLibraryService() {
             }
         })
 
+        // Wire up next/prev/seek from Android Auto through StateProxyPlayer
+        stateProxyPlayer.onNextRequested = { sendCommandToActivity(PlayerCommand.Next) }
+        stateProxyPlayer.onPreviousRequested = { sendCommandToActivity(PlayerCommand.Previous) }
+        stateProxyPlayer.onSeekRequested = { posMs -> sendCommandToActivity(PlayerCommand.Seek(posMs)) }
+
+        val sessionExtras = android.os.Bundle().apply {
+            putBoolean("android.media.session.SLOT_RESERVATION_SKIP_TO_NEXT", true)
+            putBoolean("android.media.session.SLOT_RESERVATION_SKIP_TO_PREV", true)
+        }
+
         mediaLibrarySession = MediaLibrarySession.Builder(
             this,
             stateProxyPlayer,
@@ -105,16 +115,13 @@ class PlaybackService : MediaLibraryService() {
                     val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().build()
                     val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon().build()
 
-                    // Auto-play when Android Auto connects
+                    // Track Android Auto connection — don't auto-play (AA requires paused initial state)
                     val packageName = controller.packageName
                     if (packageName.contains("android.auto") ||
                         packageName.contains("car") ||
                         packageName.contains("automotive") ||
                         packageName.contains("media.session")) {
-                        if (!autoConnected) {
-                            autoConnected = true
-                            sendCommandToActivity(PlayerCommand.AutoPlay)
-                        }
+                        autoConnected = true
                     }
 
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
@@ -161,7 +168,7 @@ class PlaybackService : MediaLibraryService() {
                                         .setIsPlayable(true)
                                         .setIsBrowsable(false)
                                         .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
-                                        .setArtworkUri(Uri.parse("https://img.youtube.com/vi/$thumbId/mqdefault.jpg"))
+                                        .setArtworkUri(ArtworkProvider.getArtworkUri(thumbId))
                                         .build()
                                 )
                                 .build()
@@ -189,7 +196,7 @@ class PlaybackService : MediaLibraryService() {
                     return super.onMediaButtonEvent(session, controllerInfo, intent)
                 }
             }
-        ).build()
+        ).setSessionExtras(sessionExtras).build()
 
         startForeground(NOTIFICATION_ID, createNotification())
     }
@@ -253,12 +260,19 @@ class PlaybackService : MediaLibraryService() {
     }
 
     fun updateMetadata(title: String?, artist: String?, thumbnailUrl: String?) {
-        stateProxyPlayer.updateMetadata(title, artist, thumbnailUrl)
-        // Load artwork bitmap in background for Android Auto
-        if (thumbnailUrl != null) {
+        // Extract video ID from thumbnail URL for content:// URI
+        val videoId = thumbnailUrl?.let {
+            Regex("/vi/([^/]+)/").find(it)?.groupValues?.get(1)
+        }
+        val contentUri = videoId?.let { ArtworkProvider.getArtworkUri(it) }
+        stateProxyPlayer.updateMetadata(title, artist, contentUri?.toString())
+
+        // Pre-cache artwork so Android Auto can read it immediately
+        if (videoId != null) {
             serviceScope.launch {
                 try {
-                    val url = URL(thumbnailUrl)
+                    // Trigger the ContentProvider to cache the image
+                    val url = URL("https://img.youtube.com/vi/$videoId/hqdefault.jpg")
                     val bitmap = BitmapFactory.decodeStream(url.openStream())
                     if (bitmap != null) {
                         stateProxyPlayer.updateArtworkBitmap(bitmap)

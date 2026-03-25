@@ -465,12 +465,34 @@ caribbean:[
 {id:'P_kBk0RsMo4',t:'Under Mi Sensi',a:'Barrington Levy'},
 {id:'H7qG0BjJmP4',t:'Shake It To The Max',a:'MOLIY ft. Skillibeng & Shenseea'},
 ],
+todays_hits:[
+{id:'NYH6Oa4PXlY',t:'squabble up',a:'Kendrick Lamar'},
+{id:'T6eK-2OQtew',t:'Not Like Us',a:'Kendrick Lamar'},
+{id:'HfWLgELllZs',t:'luther',a:'Kendrick Lamar'},
+{id:'rpPUPYZdaac',t:'Anita Max Wynn',a:'Drake'},
+{id:'F7o0upORtCw',t:'Rich Baby Daddy',a:'Drake'},
+{id:'ntP8vvswhYM',t:'We Don\'t Trust You',a:'Future & Metro Boomin'},
+{id:'LOqGYF0oFIg',t:'Creepin',a:'Metro Boomin ft. The Weeknd & 21 Savage'},
+{id:'U-l4ya3ejko',t:'FE!N',a:'Travis Scott ft. Playboi Carti'},
+{id:'1xyDzTqXSoA',t:'TGIF',a:'GloRilla'},
+{id:'ru64eEvd6Ak',t:'Get It Sexyy',a:'Sexyy Red'},
+{id:'roRlDyfH3gk',t:'Pound Town 2',a:'Sexyy Red ft. Nicki Minaj'},
+{id:'b3hFk4tYwFE',t:'Crazy',a:'Lil Baby'},
+{id:'eM2hELFg3wE',t:'Fall Fast',a:'Rod Wave'},
+{id:'V2G8ESoDXm8',t:'Saturn',a:'SZA'},
+{id:'wlmUnWLaeog',t:'Water',a:'Tyla'},
+{id:'N6i1SeRmKL0',t:'Residuals',a:'Chris Brown'},
+{id:'ukbiRcyzrpc',t:'Redrum',a:'21 Savage'},
+{id:'2jjXeFZSQy0',t:'Think U The Shit',a:'Ice Spice'},
+{id:'l21wGxlWwPw',t:'Fukumean',a:'Gunna'},
+{id:'pFveRSgYQ0w',t:'Big Mama',a:'Latto'},
+],
 };
 
-const TAB_NAMES={top40:'Top 40',ace:'Ace Burns',drake:'Drizzy',bars:'Bars',heat:'Heat',queens:'Queens',afro:'Afro',smooth:'Smooth',soul:'Soul',vibes:'Vibes',santana:'Santana',meditation:'Meditate',workout:'Workout',skating:'Skating',oldies:'Oldies',unexpected:'Unexpected',emerging:'Emerging',caribbean:'Caribbean'};
-const TAB_ORDER=['top40','ace','drake','bars','heat','queens','afro','smooth','soul','vibes','santana','meditation','workout','skating','oldies','unexpected','emerging','caribbean'];
+const TAB_NAMES={top40:'Top 40',ace:'Ace Burns',drake:'Drizzy',bars:'Bars',heat:'Heat',queens:'Queens',afro:'Afro',smooth:'Smooth',soul:'Soul',vibes:'Vibes',santana:'Santana',meditation:'Meditate',workout:'Workout',skating:'Skating',oldies:'Oldies',unexpected:'Unexpected',emerging:'Emerging',caribbean:'Caribbean',todays_hits:'Today\'s Hits'};
+const TAB_ORDER=['top40','todays_hits','ace','drake','bars','heat','queens','afro','smooth','soul','vibes','santana','meditation','workout','skating','oldies','unexpected','emerging','caribbean'];
 
-let cur='top40',idx=-1,yt=null,ready=false;
+let cur='todays_hits',idx=-1,yt=null,ready=false;
 let shuf=true,rep=false,timer=null,shufQ=[];
 let errSet=new Set(),retries=0,loadGen=0;
 
@@ -794,6 +816,9 @@ else{stat('All tracks blocked');retries=0;}
 buildShuf();renderTabs();renderPL();
 // Default shuffle ON — highlight the button
 if(shuf)document.getElementById('shufBtn').classList.add('on');
+// Auto-play random track from Today's Hits on load
+var randomIdx=Math.floor(Math.random()*PL[cur].length);
+play(randomIdx);
 </script>
 </body>
 </html>

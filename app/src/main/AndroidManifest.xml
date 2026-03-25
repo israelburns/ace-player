@@ -43,6 +43,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Artwork ContentProvider for Android Auto album art -->
+        <provider
+            android:name=".service.ArtworkProvider"
+            android:authorities="com.yourapp.youtubeplayer.artwork"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+
         <!-- Android Auto metadata -->
         <meta-data
             android:name="com.google.android.gms.car.application"

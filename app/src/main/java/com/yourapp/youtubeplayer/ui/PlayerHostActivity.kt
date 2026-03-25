@@ -103,20 +103,25 @@ class PlayerHostActivity : AppCompatActivity() {
     private fun handleServiceCommand(command: PlaybackService.PlayerCommand) {
         when (command) {
             is PlaybackService.PlayerCommand.Play -> {
-                webView.evaluateJavascript("if(yt)yt.playVideo();", null)
+                // Resume whichever source is active (direct audio or YT iframe)
+                webView.evaluateJavascript(
+                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.play();}else if(yt){yt.playVideo();}", null
+                )
             }
             is PlaybackService.PlayerCommand.Pause -> {
-                webView.evaluateJavascript("if(yt)yt.pauseVideo();", null)
+                webView.evaluateJavascript(
+                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.pause();}else if(yt){yt.pauseVideo();}", null
+                )
             }
             is PlaybackService.PlayerCommand.Next -> {
-                webView.evaluateJavascript("nextTrack();", null)
+                webView.evaluateJavascript("next();", null)
             }
             is PlaybackService.PlayerCommand.Previous -> {
-                webView.evaluateJavascript("previousTrack();", null)
+                webView.evaluateJavascript("prev();", null)
             }
             is PlaybackService.PlayerCommand.Seek -> {
                 webView.evaluateJavascript(
-                    "if(yt)yt.seekTo(${command.positionMs / 1000},true);", null
+                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.currentTime=${command.positionMs / 1000};}else if(yt){yt.seekTo(${command.positionMs / 1000},true);}", null
                 )
             }
             is PlaybackService.PlayerCommand.LoadVideo -> {
@@ -125,15 +130,13 @@ class PlayerHostActivity : AppCompatActivity() {
                 )
             }
             is PlaybackService.PlayerCommand.AutoPlay -> {
-                // Auto-play first track when Android Auto connects
                 if (playerReady) {
-                    webView.evaluateJavascript("autoPlayFirst();", null)
+                    webView.evaluateJavascript("play(0);", null)
                 } else {
-                    // Queue it — will fire when player ready
                     activityScope.launch {
                         while (!playerReady) { delay(500L) }
                         runOnUiThread {
-                            webView.evaluateJavascript("autoPlayFirst();", null)
+                            webView.evaluateJavascript("play(0);", null)
                         }
                     }
                 }
@@ -144,14 +147,28 @@ class PlayerHostActivity : AppCompatActivity() {
     private fun startPositionUpdates() {
         positionUpdateJob = activityScope.launch {
             while (isActive) {
-                webView.evaluateJavascript("yt?yt.getCurrentTime():0") { result ->
-                    val posSec = result?.toDoubleOrNull() ?: 0.0
-                    val posMs = (posSec * 1000).toLong()
-                    webView.evaluateJavascript("yt?yt.getPlayerState():-1") { stateResult ->
-                        val state = stateResult?.toIntOrNull() ?: -1
-                        val isPlaying = state == 1
-                        PlaybackService.instance?.updatePlaybackState(isPlaying, posMs)
-                    }
+                // Check both audio sources — direct audio element and YT iframe
+                webView.evaluateJavascript(
+                    "(function(){" +
+                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio&&ap&&ap.src){" +
+                    "return JSON.stringify({pos:ap.currentTime||0,playing:!ap.paused});" +
+                    "}else if(yt){" +
+                    "return JSON.stringify({pos:yt.getCurrentTime()||0,playing:yt.getPlayerState()===1});" +
+                    "}else{return JSON.stringify({pos:0,playing:false});}" +
+                    "})()"
+                ) { result ->
+                    try {
+                        val json = result?.trim('"')?.replace("\\\"", "\"")
+                            ?.replace("\\\\", "\\")
+                        if (json != null && json.startsWith("{")) {
+                            val posMatch = Regex("\"pos\":(\\d+\\.?\\d*)").find(json)
+                            val playMatch = Regex("\"playing\":(true|false)").find(json)
+                            val posSec = posMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                            val isPlaying = playMatch?.groupValues?.get(1) == "true"
+                            val posMs = (posSec * 1000).toLong()
+                            PlaybackService.instance?.updatePlaybackState(isPlaying, posMs)
+                        }
+                    } catch (_: Exception) {}
                 }
                 delay(500L)
             }

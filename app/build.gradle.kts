@@ -11,8 +11,8 @@ android {
         applicationId = "com.yourapp.youtubeplayer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "3.1.0-ace"
+        versionCode = 8
+        versionName = "3.3.0-ace"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

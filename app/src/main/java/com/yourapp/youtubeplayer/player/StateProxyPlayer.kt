@@ -19,6 +19,11 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
     private var currentArtworkUri: Uri? = null
     private var currentArtworkData: ByteArray? = null
 
+    // Callback for next/prev commands from Android Auto
+    var onNextRequested: (() -> Unit)? = null
+    var onPreviousRequested: (() -> Unit)? = null
+    var onSeekRequested: ((Long) -> Unit)? = null
+
     fun updatePlaybackState(playing: Boolean, position: Long) {
         isPlaying = playing
         positionMs = position
@@ -92,7 +97,15 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
     }
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): com.google.common.util.concurrent.ListenableFuture<*> {
-        this.positionMs = positionMs
+        // seekCommand constants: 0=default, 1=previous, 2=next (from SimpleBasePlayer)
+        when (seekCommand) {
+            2 -> onNextRequested?.invoke()       // SEEK_TO_NEXT
+            1 -> onPreviousRequested?.invoke()    // SEEK_TO_PREVIOUS
+            else -> {
+                this.positionMs = positionMs
+                onSeekRequested?.invoke(positionMs)
+            }
+        }
         return com.google.common.util.concurrent.Futures.immediateVoidFuture()
     }
 }
