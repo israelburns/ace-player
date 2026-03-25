@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.PowerManager
@@ -62,7 +63,17 @@ class PlaybackService : MediaLibraryService() {
     private val playlistNames = listOf(
         "Top 40", "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
         "Afro", "Smooth", "Soul", "Vibes", "Santana",
-        "Meditate", "Workout", "Skating"
+        "Meditate", "Workout", "Skating", "Oldies",
+        "Unexpected", "Emerging", "Caribbean"
+    )
+
+    // Representative YouTube video IDs for playlist artwork (Android Auto icons)
+    private val playlistThumbnails = listOf(
+        "ETPBnOlNeOw", "ogXC9YU_hmM", "V7UgPHjN9qE", "H58vbez_m4E",
+        "ETPBnOlNeOw", "hsm4poTWjMs", "dNt1QR1ecuM", "Z9eMk051dYg",
+        "4TYv2PhG89A", "7wfYIMyS_dI", "6Whgn_iE5uc", "w3aAKiZ0euE",
+        "6ONRf7h3Mdk", "0OfSyl9gkWM", "7ll7ocQbH_k",
+        "Eix8FGWaLn0", "kf0YhDDWl7c", "yMi_gAl3APE"
     )
 
     override fun onCreate() {
@@ -141,6 +152,7 @@ class PlaybackService : MediaLibraryService() {
                 ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
                     if (parentId == ROOT_ID) {
                         val items = playlistNames.mapIndexed { index, name ->
+                            val thumbId = playlistThumbnails.getOrElse(index) { "ogXC9YU_hmM" }
                             MediaItem.Builder()
                                 .setMediaId("playlist_$index")
                                 .setMediaMetadata(
@@ -149,6 +161,7 @@ class PlaybackService : MediaLibraryService() {
                                         .setIsPlayable(true)
                                         .setIsBrowsable(false)
                                         .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
+                                        .setArtworkUri(Uri.parse("https://img.youtube.com/vi/$thumbId/mqdefault.jpg"))
                                         .build()
                                 )
                                 .build()
