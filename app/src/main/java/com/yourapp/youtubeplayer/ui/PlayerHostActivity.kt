@@ -57,7 +57,7 @@ class PlayerHostActivity : AppCompatActivity() {
             javaScriptEnabled = true
             mediaPlaybackRequiresUserGesture = false
             domStorageEnabled = true
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = WebSettings.LOAD_NO_CACHE
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             // Keep WebView alive in background
             @Suppress("DEPRECATION")
@@ -87,7 +87,8 @@ class PlayerHostActivity : AppCompatActivity() {
         webView.webChromeClient = WebChromeClient()
 
         // Load from GCP server — YouTube IFrame API requires HTTPS origin
-        webView.loadUrl("https://ace-taskmaster.duckdns.org/player")
+        // Cache-bust to ensure latest JS (native audio routing)
+        webView.loadUrl("https://ace-taskmaster.duckdns.org/player?v=" + System.currentTimeMillis())
 
         // Request battery optimization exemption so playback survives screen off
         requestBatteryExemption()
@@ -101,17 +102,25 @@ class PlayerHostActivity : AppCompatActivity() {
     }
 
     private fun handleServiceCommand(command: PlaybackService.PlayerCommand) {
+        val svc = PlaybackService.instance
         when (command) {
             is PlaybackService.PlayerCommand.Play -> {
-                // Resume whichever source is active (direct audio or YT iframe)
-                webView.evaluateJavascript(
-                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.play();}else if(yt){yt.playVideo();}", null
-                )
+                if (svc?.isNativeAudioActive == true) {
+                    svc.nativePlay()
+                } else {
+                    webView.evaluateJavascript(
+                        "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.play();}else if(yt){yt.playVideo();}", null
+                    )
+                }
             }
             is PlaybackService.PlayerCommand.Pause -> {
-                webView.evaluateJavascript(
-                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.pause();}else if(yt){yt.pauseVideo();}", null
-                )
+                if (svc?.isNativeAudioActive == true) {
+                    svc.nativePause()
+                } else {
+                    webView.evaluateJavascript(
+                        "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.pause();}else if(yt){yt.pauseVideo();}", null
+                    )
+                }
             }
             is PlaybackService.PlayerCommand.Next -> {
                 webView.evaluateJavascript("next();", null)
@@ -120,13 +129,22 @@ class PlayerHostActivity : AppCompatActivity() {
                 webView.evaluateJavascript("prev();", null)
             }
             is PlaybackService.PlayerCommand.Seek -> {
-                webView.evaluateJavascript(
-                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.currentTime=${command.positionMs / 1000};}else if(yt){yt.seekTo(${command.positionMs / 1000},true);}", null
-                )
+                if (svc?.isNativeAudioActive == true) {
+                    svc.nativeSeek(command.positionMs)
+                } else {
+                    webView.evaluateJavascript(
+                        "if(typeof useDirectAudio!=='undefined'&&useDirectAudio){ap.currentTime=${command.positionMs / 1000};}else if(yt){yt.seekTo(${command.positionMs / 1000},true);}", null
+                    )
+                }
             }
             is PlaybackService.PlayerCommand.LoadVideo -> {
                 webView.evaluateJavascript(
                     "if(yt)yt.loadVideoById('${command.videoId}');", null
+                )
+            }
+            is PlaybackService.PlayerCommand.LoadPlaylist -> {
+                webView.evaluateJavascript(
+                    "if(typeof switchPL==='function'){switchPL('${command.key}');play(0);}", null
                 )
             }
             is PlaybackService.PlayerCommand.AutoPlay -> {
@@ -147,28 +165,41 @@ class PlayerHostActivity : AppCompatActivity() {
     private fun startPositionUpdates() {
         positionUpdateJob = activityScope.launch {
             while (isActive) {
-                // Check both audio sources — direct audio element and YT iframe
-                webView.evaluateJavascript(
-                    "(function(){" +
-                    "if(typeof useDirectAudio!=='undefined'&&useDirectAudio&&ap&&ap.src){" +
-                    "return JSON.stringify({pos:ap.currentTime||0,playing:!ap.paused});" +
-                    "}else if(yt){" +
-                    "return JSON.stringify({pos:yt.getCurrentTime()||0,playing:yt.getPlayerState()===1});" +
-                    "}else{return JSON.stringify({pos:0,playing:false});}" +
-                    "})()"
-                ) { result ->
-                    try {
-                        val json = result?.trim('"')?.replace("\\\"", "\"")
-                            ?.replace("\\\\", "\\")
-                        if (json != null && json.startsWith("{")) {
-                            val posMatch = Regex("\"pos\":(\\d+\\.?\\d*)").find(json)
-                            val playMatch = Regex("\"playing\":(true|false)").find(json)
-                            val posSec = posMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-                            val isPlaying = playMatch?.groupValues?.get(1) == "true"
-                            val posMs = (posSec * 1000).toLong()
-                            PlaybackService.instance?.updatePlaybackState(isPlaying, posMs)
-                        }
-                    } catch (_: Exception) {}
+                val svc = PlaybackService.instance
+                if (svc?.isNativeAudioActive == true) {
+                    // Native ExoPlayer — read position directly, no WebView needed
+                    svc.updatePlaybackState(svc.isNativePlaying(), svc.getNativePosition())
+                    // Sync position back to JS UI
+                    val posSec = svc.getNativePosition() / 1000.0
+                    val durSec = svc.getNativeDuration() / 1000.0
+                    val playing = svc.isNativePlaying()
+                    webView.evaluateJavascript(
+                        "if(typeof _nativeSync==='function')_nativeSync($posSec,$durSec,$playing);", null
+                    )
+                } else {
+                    // WebView audio — poll JS for position
+                    webView.evaluateJavascript(
+                        "(function(){" +
+                        "if(typeof useDirectAudio!=='undefined'&&useDirectAudio&&ap&&ap.src){" +
+                        "return JSON.stringify({pos:ap.currentTime||0,playing:!ap.paused});" +
+                        "}else if(yt){" +
+                        "return JSON.stringify({pos:yt.getCurrentTime()||0,playing:yt.getPlayerState()===1});" +
+                        "}else{return JSON.stringify({pos:0,playing:false});}" +
+                        "})()"
+                    ) { result ->
+                        try {
+                            val json = result?.trim('"')?.replace("\\\"", "\"")
+                                ?.replace("\\\\", "\\")
+                            if (json != null && json.startsWith("{")) {
+                                val posMatch = Regex("\"pos\":(\\d+\\.?\\d*)").find(json)
+                                val playMatch = Regex("\"playing\":(true|false)").find(json)
+                                val posSec = posMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                                val isPlaying = playMatch?.groupValues?.get(1) == "true"
+                                val posMs = (posSec * 1000).toLong()
+                                PlaybackService.instance?.updatePlaybackState(isPlaying, posMs)
+                            }
+                        } catch (_: Exception) {}
+                    }
                 }
                 delay(500L)
             }
@@ -184,8 +215,11 @@ class PlayerHostActivity : AppCompatActivity() {
         @JavascriptInterface
         fun onStateChange(state: Int) {
             runOnUiThread {
-                val isPlaying = state == 1
-                PlaybackService.instance?.updatePlaybackState(isPlaying, 0)
+                val svc = PlaybackService.instance
+                if (svc?.isNativeAudioActive != true) {
+                    val isPlaying = state == 1
+                    svc?.updatePlaybackState(isPlaying, 0)
+                }
             }
         }
 
@@ -200,6 +234,41 @@ class PlayerHostActivity : AppCompatActivity() {
         @JavascriptInterface
         fun onError(errorCode: Int) {
             // Handled in JS (auto-skip)
+        }
+
+        @JavascriptInterface
+        fun playNativeAudio(url: String) {
+            android.util.Log.i("AcePlayer", "NATIVE AUDIO requested: ${url.take(80)}")
+            runOnUiThread {
+                PlaybackService.instance?.playNativeAudio(url)
+            }
+        }
+
+        @JavascriptInterface
+        fun pauseNativeAudio() {
+            runOnUiThread { PlaybackService.instance?.nativePause() }
+        }
+
+        @JavascriptInterface
+        fun resumeNativeAudio() {
+            runOnUiThread { PlaybackService.instance?.nativePlay() }
+        }
+
+        @JavascriptInterface
+        fun seekNativeAudio(positionSec: Double) {
+            runOnUiThread { PlaybackService.instance?.nativeSeek((positionSec * 1000).toLong()) }
+        }
+
+        @JavascriptInterface
+        fun stopNativeAudio() {
+            runOnUiThread {
+                PlaybackService.instance?.stopNativeAudio()
+            }
+        }
+
+        @JavascriptInterface
+        fun isNativeAudioActive(): Boolean {
+            return PlaybackService.instance?.isNativeAudioActive == true
         }
     }
 
@@ -229,6 +298,8 @@ class PlayerHostActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        // When native audio is active, don't touch WebView — ExoPlayer handles everything
+        if (PlaybackService.instance?.isNativeAudioActive == true) return
         // Samsung aggressively pauses WebView in onStop — explicitly resume it
         webView.onResume()
         webView.evaluateJavascript("if(yt&&yt.getPlayerState()===2)yt.playVideo();", null)

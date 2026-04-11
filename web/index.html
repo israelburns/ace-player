@@ -577,6 +577,15 @@ if(gen!==loadGen)return;
 if(d.url){
 useDirectAudio=true;
 if(ready&&yt)try{yt.stopVideo();}catch(e){}
+// Route to native ExoPlayer if running in Android app (bulletproof background playback)
+if(typeof AndroidBridge!=='undefined'&&AndroidBridge.playNativeAudio){
+// Use /stream proxy so audio bytes come through GCP (avoids IP-locked googlevideo URLs)
+var streamUrl='https://ace-taskmaster.duckdns.org/stream?v='+videoId;
+AndroidBridge.playNativeAudio(streamUrl);
+_nativePlaying=true;
+setIcon(true);stat('Playing');kittActivate();
+if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';
+} else {
 ap.src=d.url;
 ap.play().catch(function(){
 if(gen!==loadGen)return;
@@ -585,6 +594,7 @@ useDirectAudio=false;
 ap.pause();
 if(ready){yt.loadVideoById({videoId:videoId,startSeconds:0});setTimeout(function(){try{yt.playVideo();}catch(e){}},300);}
 });
+}
 stat('Playing');
 } else {throw new Error('no url');}
 })
@@ -597,8 +607,15 @@ if(ready){yt.loadVideoById({videoId:videoId,startSeconds:0});setTimeout(function
 });
 }
 
+var _nativePlaying=false;
 function togglePlay(){
 if(useDirectAudio){
+// Native ExoPlayer path
+if(typeof AndroidBridge!=='undefined'&&AndroidBridge.isNativeAudioActive&&AndroidBridge.isNativeAudioActive()){
+if(_nativePlaying){AndroidBridge.pauseNativeAudio();_nativePlaying=false;setIcon(false);stat('Paused');kittDeactivate();}
+else{AndroidBridge.resumeNativeAudio();_nativePlaying=true;setIcon(true);stat('Playing');kittActivate();}
+return;
+}
 if(ap.paused){ap.play();setIcon(true);stat('Playing');kittActivate();if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
 else{ap.pause();setIcon(false);stat('Paused');kittDeactivate();if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
 return;
@@ -644,6 +661,19 @@ document.getElementById('progKnob').style.left=p+'%';
 document.getElementById('tNow').textContent=fmt(c);
 document.getElementById('tEnd').textContent=fmt(d);
 },500);
+}
+
+// Native ExoPlayer sync — called from Kotlin to update UI when audio plays natively
+function _nativeSync(posSec,durSec,playing){
+if(durSec>0){
+var p=(posSec/durSec)*100;
+document.getElementById('progFill').style.width=p+'%';
+document.getElementById('progKnob').style.left=p+'%';
+document.getElementById('tNow').textContent=fmt(posSec);
+document.getElementById('tEnd').textContent=fmt(durSec);
+}
+if(playing){setIcon(true);stat('Playing');kittActivate();}
+else{setIcon(false);stat('Paused');kittDeactivate();}
 }
 
 document.getElementById('progWrap').addEventListener('click',function(e){

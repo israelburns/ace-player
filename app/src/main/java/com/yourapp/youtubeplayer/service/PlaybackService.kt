@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
@@ -24,6 +25,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.yourapp.youtubeplayer.R
 import com.yourapp.youtubeplayer.player.StateProxyPlayer
 import com.yourapp.youtubeplayer.ui.PlayerHostActivity
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +37,9 @@ class PlaybackService : MediaLibraryService() {
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private lateinit var stateProxyPlayer: StateProxyPlayer
+    private var nativePlayer: ExoPlayer? = null
+    var isNativeAudioActive = false
+        private set
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
@@ -57,6 +63,7 @@ class PlaybackService : MediaLibraryService() {
         object Previous : PlayerCommand()
         data class Seek(val positionMs: Long) : PlayerCommand()
         data class LoadVideo(val videoId: String) : PlayerCommand()
+        data class LoadPlaylist(val key: String) : PlayerCommand()
         object AutoPlay : PlayerCommand()
     }
 
@@ -82,14 +89,50 @@ class PlaybackService : MediaLibraryService() {
         createNotificationChannel()
         acquireWakeLocks()
 
+        // Audio attributes for music — routes to Bluetooth A2DP and requests focus
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        // Native ExoPlayer for background-safe audio playback
+        nativePlayer = ExoPlayer.Builder(this)
+            .setHandleAudioBecomingNoisy(true)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
+            .build().apply {
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (isNativeAudioActive) {
+                            val playing = playWhenReady && playbackState == Player.STATE_READY
+                            stateProxyPlayer.updatePlaybackState(playing, currentPosition)
+                        }
+                        // Track ended — tell JS to advance to next
+                        if (playbackState == Player.STATE_ENDED && isNativeAudioActive) {
+                            sendCommandToActivity(PlayerCommand.Next)
+                        }
+                    }
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        if (isNativeAudioActive) {
+                            stateProxyPlayer.updatePlaybackState(isPlaying, currentPosition)
+                        }
+                    }
+                })
+            }
+
         stateProxyPlayer = StateProxyPlayer(applicationContext)
 
         stateProxyPlayer.addListener(object : Player.Listener {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (playWhenReady) {
-                    sendCommandToActivity(PlayerCommand.Play)
+                if (isNativeAudioActive) {
+                    // Route play/pause to native player
+                    nativePlayer?.playWhenReady = playWhenReady
                 } else {
-                    sendCommandToActivity(PlayerCommand.Pause)
+                    if (playWhenReady) {
+                        sendCommandToActivity(PlayerCommand.Play)
+                    } else {
+                        sendCommandToActivity(PlayerCommand.Pause)
+                    }
                 }
             }
         })
@@ -104,6 +147,13 @@ class PlaybackService : MediaLibraryService() {
             putBoolean("android.media.session.SLOT_RESERVATION_SKIP_TO_PREV", true)
         }
 
+        // Set session activity so Android Auto can launch the app
+        val sessionActivityIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, PlayerHostActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         mediaLibrarySession = MediaLibrarySession.Builder(
             this,
             stateProxyPlayer,
@@ -112,17 +162,21 @@ class PlaybackService : MediaLibraryService() {
                     session: MediaSession,
                     controller: MediaSession.ControllerInfo
                 ): MediaSession.ConnectionResult {
-                    val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().build()
-                    val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon().build()
-
-                    // Track Android Auto connection — don't auto-play (AA requires paused initial state)
+                    // Track Android Auto connection
                     val packageName = controller.packageName
                     if (packageName.contains("android.auto") ||
+                        packageName.contains("gearhead") ||
                         packageName.contains("car") ||
                         packageName.contains("automotive") ||
+                        packageName.contains("projection") ||
                         packageName.contains("media.session")) {
                         autoConnected = true
                     }
+
+                    // CRITICAL: Use DEFAULT_SESSION_AND_LIBRARY_COMMANDS so the legacy
+                    // MediaBrowserService bridge grants browse access to Android Auto
+                    val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon().build()
+                    val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon().build()
 
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(sessionCommands)
@@ -182,6 +236,64 @@ class PlaybackService : MediaLibraryService() {
                     )
                 }
 
+                override fun onGetItem(
+                    session: MediaLibrarySession,
+                    browser: MediaSession.ControllerInfo,
+                    mediaId: String
+                ): ListenableFuture<LibraryResult<MediaItem>> {
+                    val index = if (mediaId.startsWith("playlist_")) {
+                        mediaId.removePrefix("playlist_").toIntOrNull() ?: 0
+                    } else 0
+                    val item = MediaItem.Builder()
+                        .setMediaId(mediaId)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(playlistNames.getOrElse(index) { "ACE PLAYER" })
+                                .setIsPlayable(true)
+                                .setIsBrowsable(false)
+                                .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
+                                .build()
+                        )
+                        .build()
+                    return Futures.immediateFuture(LibraryResult.ofItem(item, null))
+                }
+
+                override fun onAddMediaItems(
+                    mediaSession: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    mediaItems: MutableList<MediaItem>
+                ): ListenableFuture<MutableList<MediaItem>> {
+                    // Android Auto sends this when user taps a playlist
+                    val selectedId = mediaItems.firstOrNull()?.mediaId ?: ""
+                    val playlistIndex = if (selectedId.startsWith("playlist_")) {
+                        selectedId.removePrefix("playlist_").toIntOrNull() ?: 0
+                    } else 0
+
+                    // Map playlist index to JS playlist key
+                    val playlistKeys = listOf(
+                        "top40", "todays_hits", "ace", "drake", "bars", "heat", "queens",
+                        "afro", "smooth", "soul", "vibes", "santana",
+                        "meditation", "workout", "skating", "oldies",
+                        "unexpected", "emerging", "caribbean"
+                    )
+                    val key = playlistKeys.getOrElse(playlistIndex) { "top40" }
+
+                    // Tell the WebView to switch playlist and play
+                    sendCommandToActivity(PlayerCommand.LoadPlaylist(key))
+
+                    // Return the media item so AA doesn't error out
+                    val resolvedItem = MediaItem.Builder()
+                        .setMediaId(selectedId)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(playlistNames.getOrElse(playlistIndex) { "ACE PLAYER" })
+                                .setIsPlayable(true)
+                                .build()
+                        )
+                        .build()
+                    return Futures.immediateFuture(mutableListOf(resolvedItem))
+                }
+
                 override fun onMediaButtonEvent(
                     session: MediaSession,
                     controllerInfo: MediaSession.ControllerInfo,
@@ -196,7 +308,9 @@ class PlaybackService : MediaLibraryService() {
                     return super.onMediaButtonEvent(session, controllerInfo, intent)
                 }
             }
-        ).setSessionExtras(sessionExtras).build()
+        ).setSessionExtras(sessionExtras)
+         .setSessionActivity(sessionActivityIntent)
+         .build()
 
         startForeground(NOTIFICATION_ID, createNotification())
     }
@@ -282,6 +396,37 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    // Native ExoPlayer audio — bulletproof background playback
+    fun playNativeAudio(url: String) {
+        nativePlayer?.let { player ->
+            isNativeAudioActive = true
+            player.setMediaItem(MediaItem.fromUri(url))
+            player.prepare()
+            player.playWhenReady = true
+        }
+    }
+
+    fun nativePlay() {
+        if (isNativeAudioActive) nativePlayer?.play()
+    }
+
+    fun nativePause() {
+        if (isNativeAudioActive) nativePlayer?.pause()
+    }
+
+    fun nativeSeek(positionMs: Long) {
+        if (isNativeAudioActive) nativePlayer?.seekTo(positionMs)
+    }
+
+    fun stopNativeAudio() {
+        isNativeAudioActive = false
+        nativePlayer?.stop()
+    }
+
+    fun getNativePosition(): Long = if (isNativeAudioActive) nativePlayer?.currentPosition ?: 0 else 0
+    fun getNativeDuration(): Long = if (isNativeAudioActive) nativePlayer?.duration ?: 0 else 0
+    fun isNativePlaying(): Boolean = isNativeAudioActive && (nativePlayer?.isPlaying == true)
+
     // Keep service alive when user swipes app away
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Do NOT call super or stopSelf — keep playing
@@ -294,6 +439,9 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         instance = null
         autoConnected = false
+        isNativeAudioActive = false
+        nativePlayer?.release()
+        nativePlayer = null
         releaseWakeLocks()
         mediaLibrarySession?.run {
             player.release()

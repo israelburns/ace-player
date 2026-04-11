@@ -50,6 +50,7 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
         val metadataBuilder = MediaMetadata.Builder()
             .setTitle(currentTitle ?: "ACE PLAYER")
             .setArtist(currentArtist ?: "")
+            .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
             .setArtworkUri(currentArtworkUri)
 
         // Set artwork bitmap data for Android Auto (URI alone doesn't work in car)
@@ -76,10 +77,13 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
                     .addAll(
                         Player.COMMAND_PLAY_PAUSE,
                         Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+                        Player.COMMAND_SEEK_TO_NEXT,
+                        Player.COMMAND_SEEK_TO_PREVIOUS,
                         Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                         Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
                         Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
-                        Player.COMMAND_GET_MEDIA_ITEMS_METADATA
+                        Player.COMMAND_GET_MEDIA_ITEMS_METADATA,
+                        Player.COMMAND_GET_TIMELINE
                     )
                     .build()
             )
@@ -97,10 +101,9 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
     }
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): com.google.common.util.concurrent.ListenableFuture<*> {
-        // seekCommand constants: 0=default, 1=previous, 2=next (from SimpleBasePlayer)
         when (seekCommand) {
-            2 -> onNextRequested?.invoke()       // SEEK_TO_NEXT
-            1 -> onPreviousRequested?.invoke()    // SEEK_TO_PREVIOUS
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> onNextRequested?.invoke()
+            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> onPreviousRequested?.invoke()
             else -> {
                 this.positionMs = positionMs
                 onSeekRequested?.invoke(positionMs)
