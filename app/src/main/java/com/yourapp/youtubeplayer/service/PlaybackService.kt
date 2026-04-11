@@ -56,6 +56,28 @@ class PlaybackService : MediaLibraryService() {
         var autoConnected = false
     }
 
+    // Queue items synced from JS — each is {id, t, a}
+    data class QueueTrack(val id: String, val title: String, val artist: String)
+    private val queueTracks = mutableListOf<QueueTrack>()
+
+    fun updateQueue(json: String) {
+        try {
+            queueTracks.clear()
+            // Parse JSON array: [{id:"...",t:"...",a:"..."},...]
+            val arr = org.json.JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                queueTracks.add(QueueTrack(
+                    obj.getString("id"),
+                    obj.getString("t"),
+                    obj.getString("a")
+                ))
+            }
+            // Notify AA that children changed
+            mediaLibrarySession?.notifyChildrenChanged("playlist_0", queueTracks.size, null)
+        } catch (_: Exception) {}
+    }
+
     sealed class PlayerCommand {
         object Play : PlayerCommand()
         object Pause : PlayerCommand()
@@ -64,11 +86,12 @@ class PlaybackService : MediaLibraryService() {
         data class Seek(val positionMs: Long) : PlayerCommand()
         data class LoadVideo(val videoId: String) : PlayerCommand()
         data class LoadPlaylist(val key: String) : PlayerCommand()
+        data class PlayIndex(val index: Int) : PlayerCommand()
         object AutoPlay : PlayerCommand()
     }
 
     private val playlistNames = listOf(
-        "Top 40", "Today's Hits", "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
+        "Queue", "Top 40", "Today's Hits", "Ace Burns", "Drizzy", "Bars", "Heat", "Queens",
         "Afro", "Smooth", "Soul", "Vibes", "Santana",
         "Meditate", "Workout", "Skating", "Oldies",
         "Unexpected", "Emerging", "Caribbean"
@@ -76,6 +99,7 @@ class PlaybackService : MediaLibraryService() {
 
     // Representative YouTube video IDs for playlist artwork (Android Auto icons)
     private val playlistThumbnails = listOf(
+        "ogXC9YU_hmM", // Queue (uses Ace Burns artwork)
         "ETPBnOlNeOw", "NYH6Oa4PXlY", "ogXC9YU_hmM", "V7UgPHjN9qE", "H58vbez_m4E",
         "ETPBnOlNeOw", "hsm4poTWjMs", "dNt1QR1ecuM", "Z9eMk051dYg",
         "4TYv2PhG89A", "7wfYIMyS_dI", "6Whgn_iE5uc", "w3aAKiZ0euE",
@@ -212,15 +236,18 @@ class PlaybackService : MediaLibraryService() {
                     params: LibraryParams?
                 ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
                     if (parentId == ROOT_ID) {
+                        // Root: show all playlists (Queue is browsable, others are playable)
                         val items = playlistNames.mapIndexed { index, name ->
                             val thumbId = playlistThumbnails.getOrElse(index) { "ogXC9YU_hmM" }
+                            val isQueue = index == 0
+                            val queueCount = if (isQueue && queueTracks.isNotEmpty()) " (${queueTracks.size})" else ""
                             MediaItem.Builder()
                                 .setMediaId("playlist_$index")
                                 .setMediaMetadata(
                                     MediaMetadata.Builder()
-                                        .setTitle(name)
+                                        .setTitle("$name$queueCount")
                                         .setIsPlayable(true)
-                                        .setIsBrowsable(false)
+                                        .setIsBrowsable(isQueue && queueTracks.isNotEmpty())
                                         .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
                                         .setArtworkUri(ArtworkProvider.getArtworkUri(thumbId))
                                         .build()
@@ -231,6 +258,29 @@ class PlaybackService : MediaLibraryService() {
                             LibraryResult.ofItemList(ImmutableList.copyOf(items), params)
                         )
                     }
+
+                    // Queue children: show individual tracks
+                    if (parentId == "playlist_0") {
+                        val items = queueTracks.mapIndexed { index, track ->
+                            MediaItem.Builder()
+                                .setMediaId("queue_track_$index")
+                                .setMediaMetadata(
+                                    MediaMetadata.Builder()
+                                        .setTitle(track.title)
+                                        .setArtist(track.artist)
+                                        .setIsPlayable(true)
+                                        .setIsBrowsable(false)
+                                        .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                        .setArtworkUri(ArtworkProvider.getArtworkUri(track.id))
+                                        .build()
+                                )
+                                .build()
+                        }
+                        return Futures.immediateFuture(
+                            LibraryResult.ofItemList(ImmutableList.copyOf(items), params)
+                        )
+                    }
+
                     return Futures.immediateFuture(
                         LibraryResult.ofItemList(ImmutableList.of(), params)
                     )
@@ -263,30 +313,42 @@ class PlaybackService : MediaLibraryService() {
                     controller: MediaSession.ControllerInfo,
                     mediaItems: MutableList<MediaItem>
                 ): ListenableFuture<MutableList<MediaItem>> {
-                    // Android Auto sends this when user taps a playlist
                     val selectedId = mediaItems.firstOrNull()?.mediaId ?: ""
-                    val playlistIndex = if (selectedId.startsWith("playlist_")) {
-                        selectedId.removePrefix("playlist_").toIntOrNull() ?: 0
-                    } else 0
 
-                    // Map playlist index to JS playlist key
-                    val playlistKeys = listOf(
-                        "top40", "todays_hits", "ace", "drake", "bars", "heat", "queens",
-                        "afro", "smooth", "soul", "vibes", "santana",
-                        "meditation", "workout", "skating", "oldies",
-                        "unexpected", "emerging", "caribbean"
-                    )
-                    val key = playlistKeys.getOrElse(playlistIndex) { "top40" }
+                    // Handle queue track selection (queue_track_0, queue_track_1, etc.)
+                    if (selectedId.startsWith("queue_track_")) {
+                        val trackIdx = selectedId.removePrefix("queue_track_").toIntOrNull() ?: 0
+                        sendCommandToActivity(PlayerCommand.LoadPlaylist("queue"))
+                        sendCommandToActivity(PlayerCommand.PlayIndex(trackIdx))
+                    } else {
+                        // Playlist selection
+                        val playlistIndex = if (selectedId.startsWith("playlist_")) {
+                            selectedId.removePrefix("playlist_").toIntOrNull() ?: 0
+                        } else 0
 
-                    // Tell the WebView to switch playlist and play
-                    sendCommandToActivity(PlayerCommand.LoadPlaylist(key))
+                        val playlistKeys = listOf(
+                            "queue", "top40", "todays_hits", "ace", "drake", "bars", "heat", "queens",
+                            "afro", "smooth", "soul", "vibes", "santana",
+                            "meditation", "workout", "skating", "oldies",
+                            "unexpected", "emerging", "caribbean"
+                        )
+                        val key = playlistKeys.getOrElse(playlistIndex) { "top40" }
+                        sendCommandToActivity(PlayerCommand.LoadPlaylist(key))
+                    }
 
                     // Return the media item so AA doesn't error out
+                    val title = if (selectedId.startsWith("queue_track_")) {
+                        val qi = selectedId.removePrefix("queue_track_").toIntOrNull() ?: 0
+                        queueTracks.getOrNull(qi)?.title ?: "ACE PLAYER"
+                    } else {
+                        val pi = selectedId.removePrefix("playlist_").toIntOrNull() ?: 0
+                        playlistNames.getOrElse(pi) { "ACE PLAYER" }
+                    }
                     val resolvedItem = MediaItem.Builder()
                         .setMediaId(selectedId)
                         .setMediaMetadata(
                             MediaMetadata.Builder()
-                                .setTitle(playlistNames.getOrElse(playlistIndex) { "ACE PLAYER" })
+                                .setTitle(title)
                                 .setIsPlayable(true)
                                 .build()
                         )
@@ -370,6 +432,10 @@ class PlaybackService : MediaLibraryService() {
     }
 
     fun updatePlaybackState(isPlaying: Boolean, positionMs: Long) {
+        // Also update duration so the seek bar and AVRCP know track length
+        if (isNativeAudioActive) {
+            stateProxyPlayer.updateDuration(nativePlayer?.duration ?: 0)
+        }
         stateProxyPlayer.updatePlaybackState(isPlaying, positionMs)
     }
 

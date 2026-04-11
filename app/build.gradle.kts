@@ -11,8 +11,8 @@ android {
         applicationId = "com.yourapp.youtubeplayer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 8
-        versionName = "3.3.0-ace"
+        versionCode = 9
+        versionName = "3.4.0-ace"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -43,6 +43,7 @@ dependencies {
     // Media3 for Background Playback & Android Auto
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
 
     // AndroidX Core
     implementation("androidx.core:core-ktx:1.12.0")

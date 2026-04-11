@@ -14,12 +14,13 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
 
     private var isPlaying = false
     private var positionMs = 0L
+    private var durationMs = 0L
     private var currentTitle: String? = null
     private var currentArtist: String? = null
     private var currentArtworkUri: Uri? = null
     private var currentArtworkData: ByteArray? = null
 
-    // Callback for next/prev commands from Android Auto
+    // Callbacks for transport controls
     var onNextRequested: (() -> Unit)? = null
     var onPreviousRequested: (() -> Unit)? = null
     var onSeekRequested: ((Long) -> Unit)? = null
@@ -28,6 +29,10 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
         isPlaying = playing
         positionMs = position
         invalidateState()
+    }
+
+    fun updateDuration(duration: Long) {
+        durationMs = duration
     }
 
     fun updateMetadata(title: String?, artist: String?, thumbnailUrl: String?) {
@@ -45,31 +50,32 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
     }
 
     override fun getState(): State {
-        val mediaItemBuilder = MediaItemData.Builder(/* uid= */ "ace_player_current")
-
         val metadataBuilder = MediaMetadata.Builder()
             .setTitle(currentTitle ?: "ACE PLAYER")
             .setArtist(currentArtist ?: "")
             .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
             .setArtworkUri(currentArtworkUri)
 
-        // Set artwork bitmap data for Android Auto (URI alone doesn't work in car)
         if (currentArtworkData != null) {
             metadataBuilder.setArtworkData(currentArtworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
         }
 
         val metadata = metadataBuilder.build()
 
-        mediaItemBuilder
-            .setMediaItem(
-                MediaItem.Builder()
-                    .setMediaId("ace_player_current")
-                    .setMediaMetadata(metadata)
-                    .build()
-            )
+        // Build a 3-item fake playlist so next/prev are always valid
+        // Index 0 = "previous", Index 1 = current (active), Index 2 = "next"
+        val prevItem = MediaItemData.Builder("ace_prev")
+            .setMediaItem(MediaItem.Builder().setMediaId("ace_prev").setMediaMetadata(metadata).build())
             .setMediaMetadata(metadata)
-
-        val playlistItems = listOf(mediaItemBuilder.build())
+            .build()
+        val currentItem = MediaItemData.Builder("ace_current")
+            .setMediaItem(MediaItem.Builder().setMediaId("ace_current").setMediaMetadata(metadata).build())
+            .setMediaMetadata(metadata)
+            .build()
+        val nextItem = MediaItemData.Builder("ace_next")
+            .setMediaItem(MediaItem.Builder().setMediaId("ace_next").setMediaMetadata(metadata).build())
+            .setMediaMetadata(metadata)
+            .build()
 
         return State.Builder()
             .setAvailableCommands(
@@ -82,16 +88,15 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
                         Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                         Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
                         Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
-                        Player.COMMAND_GET_MEDIA_ITEMS_METADATA,
-                        Player.COMMAND_GET_TIMELINE
+                        Player.COMMAND_GET_MEDIA_ITEMS_METADATA
                     )
                     .build()
             )
             .setPlayWhenReady(isPlaying, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
             .setPlaybackState(if (currentTitle != null) Player.STATE_READY else Player.STATE_IDLE)
             .setContentPositionMs(positionMs)
-            .setPlaylist(playlistItems)
-            .setCurrentMediaItemIndex(0)
+            .setPlaylist(listOf(prevItem, currentItem, nextItem))
+            .setCurrentMediaItemIndex(1) // Always at middle item
             .build()
     }
 
@@ -101,10 +106,11 @@ class StateProxyPlayer(private val context: Context) : androidx.media3.common.Si
     }
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): com.google.common.util.concurrent.ListenableFuture<*> {
-        when (seekCommand) {
-            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> onNextRequested?.invoke()
-            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> onPreviousRequested?.invoke()
+        when (mediaItemIndex) {
+            0 -> onPreviousRequested?.invoke()    // Sought to "previous" item
+            2 -> onNextRequested?.invoke()         // Sought to "next" item
             else -> {
+                // Seek within current track
                 this.positionMs = positionMs
                 onSeekRequested?.invoke(positionMs)
             }

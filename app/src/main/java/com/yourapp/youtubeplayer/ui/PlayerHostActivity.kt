@@ -80,6 +80,17 @@ class PlayerHostActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                // Restore queue from SharedPreferences
+                val savedQueue = getSharedPreferences("ace_player", MODE_PRIVATE)
+                    .getString("queue", null)
+                if (savedQueue != null) {
+                    val escaped = savedQueue.replace("\\", "\\\\").replace("'", "\\'")
+                    view?.evaluateJavascript(
+                        "try{PL.queue=JSON.parse('$escaped');updateQueueBadge();if(cur==='queue')renderPL();}catch(e){}", null
+                    )
+                    // Sync to PlaybackService for Android Auto
+                    PlaybackService.instance?.updateQueue(savedQueue)
+                }
                 PlaybackService.currentCommand?.let { handleServiceCommand(it) }
             }
         }
@@ -146,6 +157,9 @@ class PlayerHostActivity : AppCompatActivity() {
                 webView.evaluateJavascript(
                     "if(typeof switchPL==='function'){switchPL('${command.key}');play(0);}", null
                 )
+            }
+            is PlaybackService.PlayerCommand.PlayIndex -> {
+                webView.evaluateJavascript("play(${command.index});", null)
             }
             is PlaybackService.PlayerCommand.AutoPlay -> {
                 if (playerReady) {
@@ -257,6 +271,16 @@ class PlayerHostActivity : AppCompatActivity() {
         @JavascriptInterface
         fun seekNativeAudio(positionSec: Double) {
             runOnUiThread { PlaybackService.instance?.nativeSeek((positionSec * 1000).toLong()) }
+        }
+
+        @JavascriptInterface
+        fun saveQueue(json: String) {
+            getSharedPreferences("ace_player", MODE_PRIVATE)
+                .edit().putString("queue", json).apply()
+            // Sync queue to PlaybackService for Android Auto browse tree
+            runOnUiThread {
+                PlaybackService.instance?.updateQueue(json)
+            }
         }
 
         @JavascriptInterface
