@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="gold">#C8A54E</color>
-    <color name="purple_accent">#6C5CE7</color>
-    <color name="dark_bg">#08080C</color>
-    <color name="dark_surface">#0D0D14</color>
+    <!-- Ace Player web-player palette -->
+    <color name="bg">#08080c</color>
+    <color name="bg2">#0d0d14</color>
+    <color name="bg_top_bar">#0d0d14</color>
+    <color name="surface">#1a1a2a</color>
+    <color name="surface_low">#0f0f18</color>
+    <color name="gold">#c8a54e</color>
+    <color name="gold_dim">#8A6F18</color>
+    <color name="gold_tint">#14c8a54e</color> <!-- rgba(200,165,78,0.08) -->
+    <color name="purple1">#6c5ce7</color>
+    <color name="purple2">#a855f7</color>
+    <color name="text_primary">#ffffff</color>
+    <color name="text_secondary">#888888</color>
+    <color name="text_dim">#555555</color>
+    <color name="tab_border_inactive">#1a1a2a</color>
+    <color name="status_dot">#4ade80</color>
+
+    <!-- Legacy aliases (kept so old xml references still resolve) -->
+    <color name="dark_bg">#08080c</color>
+    <color name="dark_surface">#0d0d14</color>
+    <color name="mid_gray">#1a1a2a</color>
+    <color name="light_gray">#888888</color>
+    <color name="white">#ffffff</color>
     <color name="black">#000000</color>
 </resources>

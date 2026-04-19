@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "com.yourapp.youtubeplayer"
+    namespace = "com.aceburns.ultrainstinct"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.yourapp.youtubeplayer"
+        applicationId = "com.aceburns.ultrainstinct"
         minSdk = 24
         targetSdk = 34
-        versionCode = 9
-        versionName = "3.4.0-ace"
+        versionCode = 100
+        versionName = "1.0-UI"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -35,10 +35,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 dependencies {
-    val media3Version = "1.2.1"
+    val media3Version = "1.4.1"
 
     // Media3 for Background Playback & Android Auto
     implementation("androidx.media3:media3-session:$media3Version")
@@ -49,6 +55,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

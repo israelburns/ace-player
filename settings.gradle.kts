@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "YouTubeCuratedPlayer"
+rootProject.name = "AcePlayerUltraInstinct"
 include(":app")
